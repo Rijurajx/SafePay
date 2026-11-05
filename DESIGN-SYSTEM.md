@@ -51,3 +51,4 @@ Before any milestone UI is finalized:
 2. **Distill & Quiet:** Strip unnecessary clutter (`distill`, `quieter`).
 3. **Audit:** Verify accessibility and interaction targets (`web-design-guidelines`).
 4. **Critique & Polish:** Score the UX and perform pixel-level craft pass (`critique`, `polish`).
+

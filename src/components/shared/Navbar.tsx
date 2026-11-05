@@ -24,14 +24,14 @@ export function Navbar({ user, onLogout }: NavbarProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Brand */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
-            <Shield className="w-6 h-6" />
+          <div className="w-10 h-10 rounded-xl bg-slate-900 text-emerald-400 flex items-center justify-center shadow-md border border-slate-800">
+            <Shield className="w-5 h-5 text-emerald-400" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-900 text-lg tracking-tight">Protected Money</span>
-              <span className="text-xs bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-full border border-blue-200">
-                Companion
+              <span className="font-bold text-slate-900 text-lg tracking-tight">SafePay</span>
+              <span className="text-[11px] bg-emerald-50 text-emerald-800 font-semibold px-2 py-0.5 rounded-full border border-emerald-200">
+                Protected Money
               </span>
             </div>
             <p className="text-xs text-slate-500 hidden sm:block">
