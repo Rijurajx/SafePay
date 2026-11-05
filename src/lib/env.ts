@@ -21,3 +21,4 @@ export const env = envSchema.parse({
   AUTH_SECRET: process.env.AUTH_SECRET,
   CRON_SECRET: process.env.CRON_SECRET,
 });
+

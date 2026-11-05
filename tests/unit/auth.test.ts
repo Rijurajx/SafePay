@@ -107,3 +107,4 @@ describe('Milestone 1: Role-Independent Caregiver Authorization', () => {
     expect(strangerAccess.authorized).toBe(false);
   });
 });
+
