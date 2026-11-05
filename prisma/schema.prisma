@@ -1,0 +1,378 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  PROTECTED_USER
+  CAREGIVER
+}
+
+enum FamilyLinkStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum PaymentRequestStatus {
+  INITIATED
+  BLOCKED_BY_POLICY
+  AWAITING_FAMILY
+  APPROVED_FOR_CHECKOUT
+  READY_FOR_CHECKOUT
+  CHECKOUT_IN_PROGRESS
+  SETTLED
+  CAPTURE_PENDING
+  CAPTURE_FAILED
+  DECLINED_BY_FAMILY
+  EXPIRED
+  CANCELLED_BY_USER
+  RECONCILIATION_REQUIRED
+}
+
+enum RiskClassification {
+  NORMAL
+  UNUSUAL
+  POLICY_VIOLATION
+}
+
+enum ApprovalPolicy {
+  ANY_ONE
+}
+
+enum ApprovalRequestStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
+enum ApprovalDecision {
+  APPROVED
+  DECLINED
+}
+
+enum PayPalOrderStatus {
+  CREATING
+  ORDER_CREATED
+  CREATE_RECONCILIATION_REQUIRED
+  BUYER_APPROVED
+  CAPTURE_IN_PROGRESS
+  COMPLETED
+  PENDING
+  DENIED
+  LOCAL_SECURITY_REJECTED
+  CANCELLED_BY_BUYER
+  CANCELLED_BY_USER
+  RECONCILIATION_REQUIRED
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CONVERTED_TO_SETTLED
+  RELEASED
+}
+
+enum WebhookProcessingStatus {
+  RECEIVED
+  PROCESSING
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
+enum DataProvenance {
+  PAYPAL_SANDBOX_VERIFIED
+  UNVERIFIED_PENDING
+  SYNTHETIC_DEMO
+}
+
+enum AuditActorType {
+  USER
+  SYSTEM
+  PAYPAL_WEBHOOK
+  RECONCILIATION
+}
+
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  supabaseId    String?  @unique
+  email         String   @unique
+  passwordHash  String?
+  fullName      String
+  roleDefault   Role     @default(PROTECTED_USER)
+  isSynthetic   Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now()) @db.Timestamptz
+  updatedAt     DateTime @updatedAt @db.Timestamptz
+
+  elderLinks         FamilyLink[]          @relation("ElderLinks")
+  caregiverLinks     FamilyLink[]          @relation("CaregiverLinks")
+  protectionSettings ProtectionSettings?
+  recipients         Recipient[]
+  paymentRequests    PaymentRequest[]
+  spendingBaselines  SpendingBaseline[]
+  approvalRequests   ApprovalRequest[]     @relation("ElderApprovalRequests")
+  approvalResponses  ApprovalResponse[]
+  auditEvents        AuditEvent[]
+  reservations       SpendingReservation[]
+}
+
+model FamilyLink {
+  id           String           @id @default(uuid()) @db.Uuid
+  elderId      String           @db.Uuid
+  caregiverId  String           @db.Uuid
+  relationship String
+  status       FamilyLinkStatus @default(ACTIVE)
+  consentedAt  DateTime         @default(now()) @db.Timestamptz
+  revokedAt    DateTime?        @db.Timestamptz
+  createdAt    DateTime         @default(now()) @db.Timestamptz
+  updatedAt    DateTime         @updatedAt @db.Timestamptz
+
+  elder       User                 @relation("ElderLinks", fields: [elderId], references: [id], onDelete: Cascade)
+  caregiver   User                 @relation("CaregiverLinks", fields: [caregiverId], references: [id], onDelete: Cascade)
+  permission  CaregiverPermission?
+
+  @@unique([elderId, caregiverId])
+  @@index([caregiverId, status])
+}
+
+model CaregiverPermission {
+  id                  String     @id @default(uuid()) @db.Uuid
+  familyLinkId        String     @unique @db.Uuid
+  canViewTransactions Boolean    @default(true)
+  canApprovePayments  Boolean    @default(false)
+  canManageSettings   Boolean    @default(false)
+  createdAt           DateTime   @default(now()) @db.Timestamptz
+  updatedAt           DateTime   @updatedAt @db.Timestamptz
+
+  familyLink FamilyLink @relation(fields: [familyLinkId], references: [id], onDelete: Cascade)
+}
+
+model ProtectionSettings {
+  id                            String   @id @default(uuid()) @db.Uuid
+  elderId                       String   @unique @db.Uuid
+  currency                      String   @default("USD")
+  absoluteTransactionCap        Decimal  @db.Decimal(12, 2)
+  absoluteDailyCap              Decimal  @db.Decimal(12, 2)
+  familyApprovalThreshold       Decimal  @db.Decimal(12, 2)
+  requireFamilyForNewRecipient  Boolean  @default(true)
+  requireFamilyForUnusual       Boolean  @default(true)
+  approvalTimeoutMinutes        Int      @default(30)
+  version                       Int      @default(1)
+  updatedAt                     DateTime @updatedAt @db.Timestamptz
+
+  elder User @relation(fields: [elderId], references: [id], onDelete: Cascade)
+}
+
+model Recipient {
+  id           String    @id @default(uuid()) @db.Uuid
+  elderId      String    @db.Uuid
+  merchantCode String
+  merchantName String
+  category     String
+  isTrusted    Boolean   @default(false)
+  firstSeenAt  DateTime  @default(now()) @db.Timestamptz
+  lastPaidAt   DateTime? @db.Timestamptz
+  createdAt    DateTime  @default(now()) @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @db.Timestamptz
+
+  elder           User             @relation(fields: [elderId], references: [id], onDelete: Cascade)
+  paymentRequests PaymentRequest[]
+
+  @@unique([id, elderId])
+  @@unique([elderId, merchantCode])
+  @@index([elderId])
+}
+
+model PaymentRequest {
+  id                      String               @id @default(uuid()) @db.Uuid
+  elderId                 String               @db.Uuid
+  recipientId             String               @db.Uuid
+  merchantOrderReference  String
+  amount                  Decimal              @db.Decimal(12, 2)
+  currency                String               @default("USD")
+  status                  PaymentRequestStatus @default(INITIATED)
+  currentRiskAssessmentId String?              @unique @db.Uuid
+  requiresFamilyApproval  Boolean              @default(false)
+  policyVersion           String               @default("1.0.0")
+  baselineVersion         Int?
+  provenance              DataProvenance       @default(UNVERIFIED_PENDING)
+  checkoutExpiresAt       DateTime?            @db.Timestamptz
+  settledAt               DateTime?            @db.Timestamptz
+  createdAt               DateTime             @default(now()) @db.Timestamptz
+  updatedAt               DateTime             @updatedAt @db.Timestamptz
+
+  elder                 User                 @relation(fields: [elderId], references: [id], onDelete: Restrict)
+  recipient             Recipient            @relation(fields: [recipientId, elderId], references: [id, elderId], onDelete: Restrict)
+  riskAssessments       RiskAssessment[]     @relation("AllAssessments")
+  currentRiskAssessment RiskAssessment?      @relation("CurrentAssessment", fields: [currentRiskAssessmentId], references: [id])
+  approvalRequest       ApprovalRequest?
+  paypalOrder           PayPalOrder?
+  reservation           SpendingReservation?
+  auditEvents           AuditEvent[]
+
+  @@unique([id, elderId])
+  @@index([elderId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([elderId, status, settledAt])
+}
+
+model SpendingReservation {
+  id               String            @id @default(uuid()) @db.Uuid
+  paymentRequestId String            @unique @db.Uuid
+  elderId          String            @db.Uuid
+  amount           Decimal           @db.Decimal(12, 2)
+  currency         String            @default("USD")
+  status           ReservationStatus @default(ACTIVE)
+  createdAt        DateTime          @default(now()) @db.Timestamptz
+  updatedAt        DateTime          @updatedAt @db.Timestamptz
+
+  elder          User           @relation(fields: [elderId], references: [id], onDelete: Cascade)
+  paymentRequest PaymentRequest @relation(fields: [paymentRequestId, elderId], references: [id, elderId], onDelete: Cascade)
+
+  @@unique([paymentRequestId, elderId])
+  @@index([elderId, status])
+}
+
+model RiskAssessment {
+  id                 String             @id @default(uuid()) @db.Uuid
+  paymentRequestId   String             @db.Uuid
+  classification     RiskClassification
+  riskScore          Int                @default(0)
+  signals            Json
+  rulesVersion       String
+  baselineVersion    Int?
+  explanationContext Json
+  createdAt          DateTime           @default(now()) @db.Timestamptz
+
+  paymentRequest      PaymentRequest  @relation("AllAssessments", fields: [paymentRequestId], references: [id], onDelete: Cascade)
+  asCurrentForPayment PaymentRequest? @relation("CurrentAssessment")
+
+  @@unique([id, paymentRequestId])
+  @@index([paymentRequestId, createdAt(sort: Desc)])
+}
+
+model ApprovalRequest {
+  id                String                @id @default(uuid()) @db.Uuid
+  paymentRequestId  String                @unique @db.Uuid
+  elderId           String                @db.Uuid
+  policy            ApprovalPolicy        @default(ANY_ONE)
+  status            ApprovalRequestStatus @default(PENDING)
+  expiresAt         DateTime              @db.Timestamptz
+  reminder5mSentAt  DateTime?             @db.Timestamptz
+  reminder15mSentAt DateTime?             @db.Timestamptz
+  respondedById     String?               @db.Uuid
+  respondedAt       DateTime?             @db.Timestamptz
+  createdAt         DateTime              @default(now()) @db.Timestamptz
+  updatedAt         DateTime              @updatedAt @db.Timestamptz
+
+  paymentRequest PaymentRequest     @relation(fields: [paymentRequestId, elderId], references: [id, elderId], onDelete: Cascade)
+  elder          User               @relation("ElderApprovalRequests", fields: [elderId], references: [id], onDelete: Restrict)
+  responses      ApprovalResponse[]
+
+  @@unique([paymentRequestId, elderId])
+  @@index([status, expiresAt])
+  @@index([elderId, status])
+}
+
+model ApprovalResponse {
+  id                String           @id @default(uuid()) @db.Uuid
+  approvalRequestId String           @db.Uuid
+  caregiverId       String           @db.Uuid
+  decision          ApprovalDecision
+  reason            String?
+  createdAt         DateTime         @default(now()) @db.Timestamptz
+
+  approvalRequest ApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+  caregiver       User            @relation(fields: [caregiverId], references: [id], onDelete: Restrict)
+
+  @@unique([approvalRequestId, caregiverId])
+  @@index([caregiverId])
+}
+
+model PayPalOrder {
+  id                           String            @id @default(uuid()) @db.Uuid
+  paymentRequestId             String            @unique @db.Uuid
+  paypalOrderId                String?           @unique
+  paypalCaptureId              String?           @unique
+  intent                       String            @default("CAPTURE")
+  status                       PayPalOrderStatus @default(CREATING)
+  amount                       Decimal           @db.Decimal(12, 2)
+  currency                     String            @default("USD")
+  createRequestId              String            @unique @db.Uuid
+  captureRequestId             String            @unique @db.Uuid
+  captureSubmissionCommittedAt DateTime?         @db.Timestamptz
+  captureFirstAttemptAt        DateTime?         @db.Timestamptz
+  rawResponse                  Json?
+  createdAt                    DateTime          @default(now()) @db.Timestamptz
+  updatedAt                    DateTime          @updatedAt @db.Timestamptz
+
+  paymentRequest PaymentRequest @relation(fields: [paymentRequestId], references: [id], onDelete: Cascade)
+
+  @@index([paypalOrderId])
+  @@index([status])
+}
+
+model SpendingBaseline {
+  id                  String         @id @default(uuid()) @db.Uuid
+  elderId             String         @db.Uuid
+  version             Int
+  sampleSize          Int
+  medianTransaction   Decimal        @db.Decimal(12, 2)
+  madTransaction      Decimal        @db.Decimal(12, 2)
+  usualStartHour      Int            @default(8)
+  usualEndHour        Int            @default(22)
+  monthlyAverage      Decimal        @db.Decimal(12, 2)
+  recipientStatistics Json
+  provenance          DataProvenance @default(PAYPAL_SANDBOX_VERIFIED)
+  createdAt           DateTime       @default(now()) @db.Timestamptz
+  updatedAt           DateTime       @updatedAt @db.Timestamptz
+
+  elder User @relation(fields: [elderId], references: [id], onDelete: Cascade)
+
+  @@unique([elderId, version])
+  @@index([elderId, version(sort: Desc)])
+}
+
+model AuditEvent {
+  id               String         @id @default(uuid()) @db.Uuid
+  paymentRequestId String?        @db.Uuid
+  actorId          String?        @db.Uuid
+  actorType        AuditActorType @default(USER)
+  eventType        String
+  oldState         String?
+  newState         String?
+  metadata         Json?
+  createdAt        DateTime       @default(now()) @db.Timestamptz
+
+  paymentRequest PaymentRequest? @relation(fields: [paymentRequestId], references: [id], onDelete: SetNull)
+  actor          User?           @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([paymentRequestId, createdAt(sort: Desc)])
+  @@index([actorId, createdAt(sort: Desc)])
+}
+
+model PayPalWebhookEvent {
+  id               String                  @id @default(uuid()) @db.Uuid
+  paypalEventId    String                  @unique
+  eventType        String
+  paypalOrderId    String?
+  paypalCaptureId  String?
+  deliveryCount    Int                     @default(1)
+  processingStatus WebhookProcessingStatus @default(RECEIVED)
+  attemptCount     Int                     @default(0)
+  leaseExpiresAt   DateTime?               @db.Timestamptz
+  nextRetryAt      DateTime?               @db.Timestamptz
+  lastError        String?
+  payload          Json
+  receivedAt       DateTime                @default(now()) @db.Timestamptz
+  processedAt      DateTime?               @db.Timestamptz
+
+  @@index([paypalOrderId])
+  @@index([processingStatus, nextRetryAt])
+}
