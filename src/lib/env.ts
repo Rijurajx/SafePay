@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
 const envSchema = z.object({
-  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  DATABASE_URL: z
+    .string()
+    .default('postgresql://postgres:postgres@localhost:5432/protected_money_dev?schema=public'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   ENABLE_DEMO_PERSONAS: z.string().default('true').transform((val) => val === 'true'),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url().default('https://mock-demo-auth.supabase.co'),
@@ -12,7 +14,7 @@ const envSchema = z.object({
 });
 
 export const env = envSchema.parse({
-  DATABASE_URL: process.env.DATABASE_URL,
+  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/protected_money_dev?schema=public',
   NODE_ENV: process.env.NODE_ENV,
   ENABLE_DEMO_PERSONAS: process.env.ENABLE_DEMO_PERSONAS,
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
