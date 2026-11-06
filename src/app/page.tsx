@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { DemoPersonaBar } from '@/components/shared/DemoPersonaBar';
 import { Navbar } from '@/components/shared/Navbar';
+import { CaregiverAIChatDrawer } from '@/components/caregiver/CaregiverAIChatDrawer';
 import { SessionUser } from '@/types';
 import {
   Shield,
@@ -44,6 +45,7 @@ export default function HomePage() {
   const [elderLinks, setElderLinks] = useState<FamilyLinkData[]>([]);
   const [activeTab, setActiveTab] = useState<'elder' | 'caregiver'>('elder');
   const [selectedScenario, setSelectedScenario] = useState<number>(0);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [testResult, setTestResult] = useState<{
     tested: boolean;
     authorized: boolean;
@@ -283,7 +285,8 @@ export default function HomePage() {
                   </div>
                 ) : (
                   /* Caregiver View (Maya, David, Sarah) */
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs">
                       <div className="flex items-center gap-3 mb-4">
                         <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center">
@@ -419,7 +422,36 @@ export default function HomePage() {
                       </div>
                     </div>
                   </div>
-                )}
+
+                  {/* Caregiver AI Assistant Quick Bar */}
+                  <div className="mt-6 bg-slate-900 rounded-2xl p-5 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm border border-slate-800">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-400/30">
+                        <Sparkles className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-sm">SafePay Caregiver AI Assistant</h3>
+                          <span className="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded font-mono">
+                            🎙️ Voice & Chat
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-300 mt-0.5">
+                          Ask about Dad&apos;s spending patterns, investigate unfamiliar merchants, or draft a gentle text message.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setIsChatOpen(true)}
+                      className="px-4 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-xs hover:bg-blue-500 active:scale-[0.98] transition-all flex items-center gap-2 shadow-xs shrink-0"
+                    >
+                      <span>Open Assistant</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
               </div>
             </div>
           </section>
@@ -1069,6 +1101,21 @@ export default function HomePage() {
           </div>
         </footer>
       </main>
+
+      {/* Caregiver AI Chatbot & Voice Assistant */}
+      <CaregiverAIChatDrawer
+        currentUser={user}
+        elderName="Mr. Thomas"
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        onOpen={() => {
+          if (!user || isThomas) {
+            switchPersona('maya').then(() => setIsChatOpen(true));
+          } else {
+            setIsChatOpen(true);
+          }
+        }}
+      />
     </div>
   );
 }

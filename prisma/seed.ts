@@ -152,29 +152,180 @@ async function main() {
     });
   }
 
-  // 4. Seed Known Recipient for Thomas
-  await prisma.recipient.upsert({
-    where: {
-      elderId_merchantCode: {
-        elderId: SEEDED_PERSONAS.thomas.id,
-        merchantCode: 'DAILY_CHRONICLE',
-      },
-    },
-    update: {
-      merchantName: 'The Daily Chronicle',
-      category: 'Subscriptions',
-      isTrusted: true,
-    },
-    create: {
-      elderId: SEEDED_PERSONAS.thomas.id,
+  // 4. Seed Known Recipients for Thomas
+  const recipientsData = [
+    {
+      id: '55555555-5555-5555-a555-555555555551',
       merchantCode: 'DAILY_CHRONICLE',
       merchantName: 'The Daily Chronicle',
       category: 'Subscriptions',
       isTrusted: true,
+      firstSeenAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+      lastPaidAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+    },
+    {
+      id: '55555555-5555-5555-a555-555555555552',
+      merchantCode: 'WALGREENS_PHARMACY',
+      merchantName: 'Walgreens Pharmacy #4102',
+      category: 'Medical & Healthcare',
+      isTrusted: true,
+      firstSeenAt: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
+      lastPaidAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    },
+    {
+      id: '55555555-5555-5555-a555-555555555553',
+      merchantCode: 'HOME_DEPOT',
+      merchantName: 'The Home Depot #0612',
+      category: 'Home & Garden',
+      isTrusted: true,
+      firstSeenAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
+      lastPaidAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+    },
+    {
+      id: '55555555-5555-5555-a555-555555555554',
+      merchantCode: 'GLOBAL_PC_TECH',
+      merchantName: 'Global PC Tech Care LLC',
+      category: 'Unverified Overseas Software',
+      isTrusted: false,
+      firstSeenAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // First seen 2 hours ago
+      lastPaidAt: null,
+    },
+  ];
+
+  for (const r of recipientsData) {
+    await prisma.recipient.upsert({
+      where: {
+        elderId_merchantCode: {
+          elderId: SEEDED_PERSONAS.thomas.id,
+          merchantCode: r.merchantCode,
+        },
+      },
+      update: {
+        merchantName: r.merchantName,
+        category: r.category,
+        isTrusted: r.isTrusted,
+        lastPaidAt: r.lastPaidAt,
+      },
+      create: {
+        id: r.id,
+        elderId: SEEDED_PERSONAS.thomas.id,
+        merchantCode: r.merchantCode,
+        merchantName: r.merchantName,
+        category: r.category,
+        isTrusted: r.isTrusted,
+        firstSeenAt: r.firstSeenAt,
+        lastPaidAt: r.lastPaidAt,
+      },
+    });
+  }
+
+  // 5. Seed Realistic Payment Requests & Pending Approvals
+  const walgreensReqId = '66666666-6666-6666-a666-666666666661';
+  await prisma.paymentRequest.upsert({
+    where: { id: walgreensReqId },
+    update: {},
+    create: {
+      id: walgreensReqId,
+      elderId: SEEDED_PERSONAS.thomas.id,
+      recipientId: '55555555-5555-5555-a555-555555555552',
+      merchantOrderReference: 'RX-994821',
+      amount: 34.2,
+      currency: 'USD',
+      status: 'SETTLED',
+      requiresFamilyApproval: false,
+      settledAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      provenance: DataProvenance.SYNTHETIC_DEMO,
     },
   });
 
-  // 5. Seed Synthetic Baseline (Version 1)
+  const homeDepotReqId = '66666666-6666-6666-a666-666666666662';
+  await prisma.paymentRequest.upsert({
+    where: { id: homeDepotReqId },
+    update: {},
+    create: {
+      id: homeDepotReqId,
+      elderId: SEEDED_PERSONAS.thomas.id,
+      recipientId: '55555555-5555-5555-a555-555555555553',
+      merchantOrderReference: 'HD-884210',
+      amount: 162.45,
+      currency: 'USD',
+      status: 'SETTLED',
+      requiresFamilyApproval: true,
+      settledAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+      provenance: DataProvenance.SYNTHETIC_DEMO,
+    },
+  });
+
+  // Flagged Pending Payment: Global PC Tech Care ($489.00)
+  const techCareReqId = '66666666-6666-6666-a666-666666666663';
+  const pendingPayment = await prisma.paymentRequest.upsert({
+    where: { id: techCareReqId },
+    update: {
+      status: 'AWAITING_FAMILY',
+      requiresFamilyApproval: true,
+    },
+    create: {
+      id: techCareReqId,
+      elderId: SEEDED_PERSONAS.thomas.id,
+      recipientId: '55555555-5555-5555-a555-555555555554',
+      merchantOrderReference: 'TECH-SUPP-9921',
+      amount: 489.0,
+      currency: 'USD',
+      status: 'AWAITING_FAMILY',
+      requiresFamilyApproval: true,
+      checkoutExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
+      provenance: DataProvenance.SYNTHETIC_DEMO,
+    },
+  });
+
+  // Seed Risk Assessment for the Flagged Payment
+  const riskAssessmentId = '77777777-7777-7777-a777-777777777771';
+  await prisma.riskAssessment.upsert({
+    where: { id: riskAssessmentId },
+    update: {},
+    create: {
+      id: riskAssessmentId,
+      paymentRequestId: pendingPayment.id,
+      classification: 'UNUSUAL',
+      riskScore: 88,
+      rulesVersion: '1.0.0',
+      signals: {
+        newMerchant: true,
+        highVelocitySpike: true,
+        overseasDomain: true,
+        unsolicitedSubscriptionRisk: true,
+      },
+      explanationContext: {
+        summary: 'Merchant domain created 14 days ago. High amount exceeding $100 family approval threshold.',
+        merchantType: 'Overseas Telemarketing / Tech Support',
+      },
+    },
+  });
+
+  // Link risk assessment to payment request
+  await prisma.paymentRequest.update({
+    where: { id: pendingPayment.id },
+    data: { currentRiskAssessmentId: riskAssessmentId },
+  });
+
+  // Seed Approval Request for Maya & David to review
+  const approvalRequestId = '88888888-8888-8888-a888-888888888881';
+  await prisma.approvalRequest.upsert({
+    where: { id: approvalRequestId },
+    update: {
+      status: 'PENDING',
+    },
+    create: {
+      id: approvalRequestId,
+      paymentRequestId: pendingPayment.id,
+      elderId: SEEDED_PERSONAS.thomas.id,
+      policy: 'ANY_ONE',
+      status: 'PENDING',
+      expiresAt: new Date(Date.now() + 25 * 60 * 1000),
+    },
+  });
+
+  // 6. Seed Synthetic Baseline (Version 1)
   await prisma.spendingBaseline.upsert({
     where: {
       elderId_version: {
