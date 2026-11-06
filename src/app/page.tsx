@@ -106,7 +106,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen soft-mesh-bg text-[#0a0c10] font-sans selection:bg-purple-100 selection:text-purple-900 relative">
-      {/* MINIMAL FLOATING ISLAND / NOTCH NAVBAR (Inspired by getuni.co) */}
+      {/* Floating Island Navigation */}
       <nav className="fixed top-5 left-1/2 -translate-x-1/2 z-50 liquid-glass rounded-full px-4 sm:px-5 py-2.5 flex items-center gap-6 sm:gap-8 shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/80 transition-all duration-200">
         {/* Brand */}
         <a href="#" className="flex items-center gap-2 group">

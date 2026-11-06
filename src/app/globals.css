@@ -3,10 +3,10 @@
 @tailwind utilities;
 
 :root {
-  --bg-color: #fbfbfb;
-  --card-bg: rgba(255, 255, 255, 0.8);
+  --bg-color: #faf9f6;
+  --card-bg: rgba(255, 255, 255, 0.82);
   --text-primary: #0a0c10;
-  --text-secondary: #5a5f6d;
+  --text-secondary: #525866;
   --hairline: rgba(10, 12, 16, 0.08);
 }
 
@@ -18,15 +18,24 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Luminous Soft Color Mesh (inspired by getuni.co) */
+/* Exact Pure-CSS Recreation of getuni.co Hero Background (https://www.getuni.co/assets/bg/hero-2560.jpg) */
 .soft-mesh-bg {
-  background-color: #fbfbfb;
+  background-color: #fceee4;
   background-image: 
-    radial-gradient(circle at 18% 12%, rgba(254, 215, 170, 0.45), transparent 45%),
-    radial-gradient(circle at 82% 16%, rgba(224, 231, 255, 0.55), transparent 50%),
-    radial-gradient(circle at 50% 38%, rgba(251, 207, 232, 0.35), transparent 55%),
-    radial-gradient(circle at 24% 68%, rgba(209, 250, 229, 0.4), transparent 50%),
-    radial-gradient(circle at 76% 78%, rgba(254, 240, 138, 0.3), transparent 45%);
+    /* Photographic Micro-Film Grain (Matches hero-2560.jpg 4.16 std-dev tactile texture) */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='heroNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.1  0 0 0 0 0.1  0 0 0 0 0.1  0 0 0 0.042 0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23heroNoise)'/%3E%3C/svg%3E"),
+    /* Layer 1: Vibrant Sunset Tangerine/Coral Ember (Bottom Center: 56% 92%) */
+    radial-gradient(ellipse 46% 36% at 56% 92%, #fd6f41 0%, rgba(253, 115, 67, 0.95) 24%, rgba(253, 172, 137, 0.65) 55%, transparent 80%),
+    /* Layer 2: Cool Sky-Blue / Periwinkle Wash (Right Edge: 95% 45%) */
+    radial-gradient(ellipse 36% 75% at 95% 45%, #aaccf0 0%, rgba(188, 211, 237, 0.9) 38%, rgba(219, 220, 237, 0.5) 68%, transparent 88%),
+    /* Layer 3: Warm Terracotta / Apricot Ember (Bottom Left: 12% 92%) */
+    radial-gradient(ellipse 40% 32% at 12% 92%, #fda885 0%, rgba(253, 170, 133, 0.8) 40%, transparent 75%),
+    /* Layer 4: Soft Lilac Transition Haze (Upper Right: 76% 25%) */
+    radial-gradient(ellipse 30% 40% at 76% 25%, rgba(219, 220, 237, 0.6) 0%, transparent 75%),
+    /* Layer 5: Warm Apricot Champagne Ambient Glow (Center: 40% 50%) */
+    radial-gradient(ellipse 55% 45% at 40% 50%, rgba(254, 212, 187, 0.7) 0%, rgba(253, 222, 214, 0.4) 60%, transparent 90%),
+    /* Layer 6: Base Diagonal Wash: Soft Blush Ivory to Warm Coral Peach */
+    linear-gradient(135deg, #fddfda 0%, #fdd6d8 28%, #fededb 52%, #fdb9a6 88%, #fda885 100%);
   background-attachment: fixed;
 }
 
