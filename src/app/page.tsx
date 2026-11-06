@@ -1,14 +1,12 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
-import { DemoPersonaBar } from '@/components/shared/DemoPersonaBar';
 import { CaregiverAIChatDrawer } from '@/components/caregiver/CaregiverAIChatDrawer';
 import { SessionUser } from '@/types';
 import {
   ShieldCheck,
   ChevronDown,
   ArrowRight,
-  Plus,
   Search,
   CheckCircle2,
   Settings,
@@ -18,10 +16,8 @@ import {
   ShoppingBag,
   Sparkles,
   RefreshCw,
-  X,
   Volume2,
-  Lock,
-  Scale,
+  Mic,
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -29,23 +25,14 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<'senior' | 'guardian'>('senior');
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'verifying' | 'completed'>('idle');
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [showCookies, setShowCookies] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [testResult, setTestResult] = useState<{
-    tested: boolean;
-    authorized: boolean;
-    status: number;
-    message: string;
-    reason?: string;
-  } | null>(null);
-  const [testLoading, setTestLoading] = useState(false);
   const [recentAction, setRecentAction] = useState<string | null>(null);
 
   // Mascot eye-tracking refs
   const heroMascotRef = useRef<HTMLDivElement>(null);
   const statementMascotRef = useRef<HTMLDivElement>(null);
 
-  // Session fetch
+  // Refresh authenticated session
   const refreshSession = async () => {
     try {
       const res = await fetch('/api/auth/session');
@@ -62,8 +49,6 @@ export default function HomePage() {
 
   useEffect(() => {
     refreshSession();
-    const timer = setTimeout(() => setShowCookies(true), 1500);
-    return () => clearTimeout(timer);
   }, []);
 
   // Mascot eye-tracking physics
@@ -78,7 +63,7 @@ export default function HomePage() {
         const deltaX = e.clientX - centerX;
         const deltaY = e.clientY - centerY;
         const angle = Math.atan2(deltaY, deltaX);
-        const distance = Math.min(maxDist, Math.hypot(deltaX, deltaY) / 20);
+        const distance = Math.min(maxDist, Math.hypot(deltaX, deltaY) / 18);
 
         const moveX = Math.cos(angle) * distance;
         const moveY = Math.sin(angle) * distance;
@@ -90,7 +75,7 @@ export default function HomePage() {
       };
 
       updateMascot(heroMascotRef.current, 5);
-      updateMascot(statementMascotRef.current, 10);
+      updateMascot(statementMascotRef.current, 11);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -102,39 +87,6 @@ export default function HomePage() {
     setTimeout(() => {
       setPaymentStatus('completed');
     }, 1200);
-  };
-
-  const handleTestApprovalPermission = async () => {
-    if (!user) return;
-    setTestLoading(true);
-    setTestResult(null);
-
-    const targetElderId = '11111111-1111-4111-a111-111111111111'; // Mr. Thomas
-    try {
-      const res = await fetch('/api/approvals/test-authorize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ elderId: targetElderId }),
-      });
-      const data = await res.json();
-      setTestResult({
-        tested: true,
-        authorized: res.ok && data.authorized,
-        status: res.status,
-        message: data.message || data.error || 'Server responded',
-        reason: data.reason,
-      });
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Unknown error';
-      setTestResult({
-        tested: true,
-        authorized: false,
-        status: 500,
-        message: `Network error: ${msg}`,
-      });
-    } finally {
-      setTestLoading(false);
-    }
   };
 
   const switchPersona = async (personaKey: 'thomas' | 'maya' | 'david' | 'sarah') => {
@@ -151,162 +103,84 @@ export default function HomePage() {
   };
 
   const isThomas = user?.email.includes('thomas');
-  const isSarah = user?.email.includes('sarah');
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-purple-900 selection:text-white">
-      {/* Top Demo Persona Switcher Bar */}
-      <DemoPersonaBar currentUser={user} onPersonaSwitched={() => refreshSession()} />
-
-      {/* FIXED GLASS NAVIGATION */}
-      <nav className="fixed top-8 sm:top-9 left-0 right-0 z-40 h-16 glass-nav px-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-xs">
-            <ShieldCheck className="w-5 h-5 text-black" />
+    <div className="min-h-screen soft-mesh-bg text-[#0a0c10] font-sans selection:bg-purple-100 selection:text-purple-900 relative">
+      {/* MINIMAL FLOATING ISLAND / NOTCH NAVBAR (Inspired by getuni.co) */}
+      <nav className="fixed top-5 left-1/2 -translate-x-1/2 z-50 liquid-glass rounded-full px-4 sm:px-5 py-2.5 flex items-center gap-6 sm:gap-8 shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/80 transition-all duration-200">
+        {/* Brand */}
+        <a href="#" className="flex items-center gap-2 group">
+          <div className="w-7 h-7 rounded-full bg-slate-950 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
           </div>
-          <span className="font-bold tracking-tight text-lg text-white">SafePay</span>
-        </div>
+          <span className="font-bold tracking-tight text-sm text-slate-900">SafePay</span>
+        </a>
 
-        <div className="hidden md:flex items-center gap-8 text-[13px] font-medium text-[#7e8083]">
-          <a href="#interactive-preview" className="hover:text-white transition-colors flex items-center gap-1">
-            Product <ChevronDown className="w-3 h-3 text-[10px]" />
-          </a>
-          <a href="#how-it-works" className="hover:text-white transition-colors flex items-center gap-1">
-            Safety <ChevronDown className="w-3 h-3 text-[10px]" />
-          </a>
-          <a href="#faq" className="hover:text-white transition-colors">
-            Pricing
-          </a>
-          <a href="#faq" className="hover:text-white transition-colors">
-            Resources
-          </a>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => switchPersona('maya')}
-            className="btn-pill btn-secondary h-9 px-5 text-sm"
+        {/* Minimal Nav Links */}
+        <div className="hidden md:flex items-center gap-6 text-[13px] font-medium text-slate-600">
+          <a
+            href="#preview"
+            className="hover:text-slate-950 transition-colors flex items-center gap-1"
           >
-            {user ? user.fullName.split(' ')[0] : 'Login'}
+            Product <ChevronDown className="w-3 h-3 opacity-50" />
+          </a>
+          <a
+            href="#how-it-works"
+            className="hover:text-slate-950 transition-colors flex items-center gap-1"
+          >
+            Safety <ChevronDown className="w-3 h-3 opacity-50" />
+          </a>
+          <a href="#faq" className="hover:text-slate-950 transition-colors">
+            Questions
+          </a>
+        </div>
+
+        {/* Minimal Actions */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              switchPersona('maya').then(() => setIsChatOpen(true));
+            }}
+            className="liquid-pill px-3.5 py-1.5 text-xs font-semibold text-slate-900 flex items-center gap-1.5 shadow-2xs hover:bg-white"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+            <span className="hidden sm:inline">Voice Assistant</span>
+            <span className="sm:hidden">Assistant</span>
           </button>
-          <div className="flex">
-            <button
-              onClick={() => {
-                switchPersona('maya').then(() => setIsChatOpen(true));
-              }}
-              className="btn-pill btn-primary h-9 px-5 text-sm rounded-r-none font-semibold"
-            >
-              Try AI Assistant
-            </button>
-            <div className="w-[1px] h-9 bg-black/10" />
-            <button
-              onClick={() => {
-                const el = document.getElementById('interactive-preview');
-                el?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="btn-pill btn-primary h-9 px-3 text-sm rounded-l-none"
-              aria-label="Scroll to preview"
-            >
-              <ChevronDown className="w-3.5 h-3.5" />
-            </button>
-          </div>
         </div>
       </nav>
 
-      {/* AUTHENTICATED WORKBENCH OVERLAY (When a demo persona is active) */}
-      {user && (
-        <section className="pt-28 pb-4 px-6 max-w-7xl mx-auto">
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl p-5 shadow-lg">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-white/5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white text-black font-bold flex items-center justify-center text-sm">
-                  {user.fullName.charAt(0)}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-white">{user.fullName}</span>
-                    <span className="text-[10px] bg-white/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold">
-                      {isThomas ? 'Protected User' : isSarah ? 'Caregiver (View-Only)' : 'Caregiver (Approver)'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#7e8083]">PostgreSQL Session UUID: {user.id}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleTestApprovalPermission}
-                  disabled={testLoading}
-                  className="btn-pill btn-secondary h-8 px-3 text-xs flex items-center gap-1.5"
-                >
-                  {testLoading ? (
-                    <RefreshCw className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Scale className="w-3 h-3 text-blue-400" />
-                  )}
-                  <span>Test Server Authorization</span>
-                </button>
-                <button
-                  onClick={() => setIsChatOpen(true)}
-                  className="btn-pill btn-primary h-8 px-3 text-xs flex items-center gap-1.5 font-bold"
-                >
-                  <Sparkles className="w-3 h-3 text-indigo-600" />
-                  <span>Open Voice Chatbot</span>
-                </button>
-              </div>
-            </div>
-
-            {testResult && (
-              <div
-                className={`mt-3 p-3 rounded-xl border text-xs flex items-center justify-between ${
-                  testResult.authorized
-                    ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
-                    : 'bg-rose-950/40 border-rose-500/30 text-rose-300'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  {testResult.authorized ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  ) : (
-                    <Lock className="w-4 h-4 text-rose-400" />
-                  )}
-                  <span>
-                    HTTP {testResult.status}: {testResult.message}
-                  </span>
-                </div>
-                {testResult.reason && <span className="opacity-75">{testResult.reason}</span>}
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
       {/* HERO SECTION */}
-      <section className={`${user ? 'pt-12' : 'pt-36 sm:pt-40'} pb-20 px-6 max-w-7xl mx-auto flex flex-col items-center text-center gap-8`}>
-        {/* Announcement Pill */}
+      <section className="pt-32 sm:pt-40 pb-16 px-6 max-w-5xl mx-auto flex flex-col items-center text-center gap-6">
+        {/* Apple-styled Announcement Pill */}
         <div
           onClick={() => {
-            const el = document.getElementById('interactive-preview');
+            const el = document.getElementById('preview');
             el?.scrollIntoView({ behavior: 'smooth' });
           }}
-          className="btn-pill btn-secondary group px-4 py-1.5 text-xs font-medium text-[#d5dbe6] cursor-pointer"
+          className="liquid-pill px-4 py-1.5 text-xs font-medium text-slate-700 cursor-pointer flex items-center gap-1.5 shadow-2xs group"
         >
-          ✨ Announcing Guardian Mode 2.0{' '}
-          <ArrowRight className="w-3.5 h-3.5 ml-1 inline-block transition-transform group-hover:translate-x-0.5" />
+          <span className="text-purple-600 font-semibold">✨ Guardian Mode 2.0</span>
+          <span className="text-slate-400">•</span>
+          <span className="text-slate-600">PayPal Companion Active</span>
+          <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
         </div>
 
-        {/* Hero Headline with Interactive Eye-Tracking Mascot */}
-        <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tighter leading-[1.05] max-w-4xl perspective-text text-white">
+        {/* Hero Title with Liquid Eye-Tracking Mascot */}
+        <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight text-slate-950 leading-[1.08] max-w-4xl">
           Payments designed for{' '}
-          <span className="inline-flex items-center align-middle mx-2">
+          <span className="inline-flex items-center align-middle mx-1 sm:mx-2">
             <div
               ref={heroMascotRef}
               id="hero-mascot"
-              className="w-12 h-12 md:w-16 md:h-16 bg-white rounded-full relative overflow-hidden mascot-container cursor-pointer hover:scale-110 transition-transform active:scale-95 shadow-md"
+              className="w-12 h-12 md:w-16 md:h-16 rounded-full relative overflow-hidden mascot-container cursor-pointer hover:scale-105 transition-transform active:scale-95 shadow-md bg-white border border-white/80"
+              style={{
+                boxShadow: '0 8px 24px -4px rgba(0,0,0,0.12), inset 0 2px 4px rgba(255,255,255,0.9)',
+              }}
             >
               <div className="absolute inset-0 flex items-center justify-center gap-1.5 md:gap-2">
-                <div className="mascot-eye w-1.5 h-3.5 md:w-2 md:h-4 bg-black rounded-full transition-all duration-100" />
-                <div className="mascot-eye w-1.5 h-3.5 md:w-2 md:h-4 bg-black rounded-full transition-all duration-100" />
+                <div className="mascot-eye w-1.5 h-3.5 md:w-2 md:h-4 bg-slate-950 rounded-full transition-all duration-100" />
+                <div className="mascot-eye w-1.5 h-3.5 md:w-2 md:h-4 bg-slate-950 rounded-full transition-all duration-100" />
               </div>
             </div>
           </span>{' '}
@@ -314,19 +188,19 @@ export default function HomePage() {
         </h1>
 
         {/* Subtitle */}
-        <p className="text-lg md:text-xl text-[#7e8083] max-w-2xl leading-relaxed text-pretty">
+        <p className="text-base sm:text-lg md:text-xl text-slate-600 max-w-2xl leading-relaxed text-pretty">
           An intelligent payment companion that helps elderly family members shop safely online, while giving guardians
           real-time oversight and peace of mind.
         </p>
 
-        {/* CTA Buttons */}
-        <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
+        {/* Action Buttons with Apple Liquid Glass feel */}
+        <div className="flex flex-wrap items-center justify-center gap-3.5 pt-2">
           <button
             onClick={() => {
-              const el = document.getElementById('interactive-preview');
+              const el = document.getElementById('preview');
               el?.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="btn-pill btn-primary h-12 px-8 font-semibold text-base"
+            className="px-6 py-3 rounded-full bg-slate-950 text-white font-medium text-sm hover:bg-slate-800 active:scale-[0.98] transition-all shadow-md shadow-slate-950/10"
           >
             Get Started
           </button>
@@ -334,40 +208,44 @@ export default function HomePage() {
             onClick={() => {
               switchPersona('maya').then(() => setIsChatOpen(true));
             }}
-            className="btn-pill btn-secondary h-12 px-8 font-medium text-base flex items-center gap-2"
+            className="liquid-glass px-6 py-3 rounded-full text-slate-900 font-medium text-sm hover:bg-white/90 active:scale-[0.98] transition-all flex items-center gap-2 shadow-xs"
           >
-            <Sparkles className="w-4 h-4 text-blue-400" />
-            <span>Launch Caregiver AI Voice</span>
+            <Mic className="w-4 h-4 text-purple-600" />
+            <span>Talk with Caregiver AI</span>
           </button>
         </div>
       </section>
 
-      {/* INTERACTIVE SHOWCASE CONTAINER (Senior Experience vs Guardian Panel) */}
-      <section id="interactive-preview" className="px-6 pb-28 max-w-7xl mx-auto">
-        <div className="w-full bg-[#1a1a1a] rounded-[2rem] border border-white/10 shadow-[0_16px_48px_-8px_rgba(0,0,0,0.5)] overflow-hidden">
-          {/* Window Chrome Header with macOS Traffic Lights */}
-          <div className="h-11 px-4 flex items-center justify-between border-b border-white/5 bg-[#202020]">
+      {/* INTERACTIVE MACBOOK MOCKUP (Senior Experience & Guardian Panel Toggle) */}
+      <section id="preview" className="px-4 sm:px-6 pb-24 max-w-6xl mx-auto">
+        <div className="w-full liquid-glass rounded-3xl sm:rounded-[2.25rem] overflow-hidden border border-white/80 shadow-[0_24px_64px_-16px_rgba(15,23,42,0.12)]">
+          {/* macOS Chrome Header with Traffic Light Dots */}
+          <div className="h-12 px-5 flex items-center justify-between border-b border-black/5 bg-white/40 backdrop-blur-md">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-[#ff5f57]" />
-              <div className="w-3 h-3 rounded-full bg-[#febc2e]" />
-              <div className="w-3 h-3 rounded-full bg-[#28c840]" />
+              <div className="w-3 h-3 rounded-full bg-[#ff5f57] border border-black/10" />
+              <div className="w-3 h-3 rounded-full bg-[#febc2e] border border-black/10" />
+              <div className="w-3 h-3 rounded-full bg-[#28c840] border border-black/10" />
             </div>
 
-            {/* Segmented Controller Tab */}
-            <div className="flex items-center gap-4">
-              <div className="flex bg-[#0a0a0a] rounded-lg p-1 text-[11px] font-semibold border border-white/5">
+            {/* Apple Liquid Glass Segmented Switcher */}
+            <div className="flex items-center gap-3">
+              <div className="flex bg-black/[0.04] p-1 rounded-full border border-black/5 text-xs font-semibold">
                 <button
                   onClick={() => setActiveTab('senior')}
-                  className={`btn-pill px-4 py-1.5 transition-all ${
-                    activeTab === 'senior' ? 'bg-[#2b2b2b] text-white' : 'text-[#7e8083] hover:text-white'
+                  className={`px-4 py-1 rounded-full transition-all duration-200 ${
+                    activeTab === 'senior'
+                      ? 'bg-white text-slate-950 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-950'
                   }`}
                 >
                   Senior Experience
                 </button>
                 <button
                   onClick={() => setActiveTab('guardian')}
-                  className={`btn-pill px-4 py-1.5 transition-all ${
-                    activeTab === 'guardian' ? 'bg-[#2b2b2b] text-white' : 'text-[#7e8083] hover:text-white'
+                  className={`px-4 py-1 rounded-full transition-all duration-200 ${
+                    activeTab === 'guardian'
+                      ? 'bg-white text-slate-950 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-950'
                   }`}
                 >
                   Guardian Panel
@@ -375,83 +253,88 @@ export default function HomePage() {
               </div>
             </div>
 
-            <button
-              onClick={() => {
-                setActiveTab(activeTab === 'senior' ? 'guardian' : 'senior');
-              }}
-              className="btn-pill bg-white/5 w-7 h-7 hover:bg-white/10 flex items-center justify-center"
-              title="Toggle View"
-            >
-              <Plus className="w-3.5 h-3.5 text-white/70" />
-            </button>
+            <div className="w-12 text-right hidden sm:block">
+              <span className="text-[11px] font-mono font-bold text-slate-400">macOS Sequoia</span>
+            </div>
           </div>
 
-          {/* Window Body */}
-          <div className="flex flex-col md:flex-row h-auto md:h-[600px] bg-[#fbfbfb] text-[#0a0a0a]">
-            {/* Aside Device List Sidebar */}
-            <aside className="w-full md:w-72 border-r border-black/5 bg-[#f5f5f5] flex flex-col shrink-0">
-              <div className="p-4">
-                <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-black/40" />
-                  <input
-                    type="text"
-                    placeholder="Search safety checks..."
-                    className="w-full h-9 pl-9 pr-4 rounded-lg bg-black/5 border border-black/10 text-sm focus:outline-hidden focus:border-black/20 text-slate-900 placeholder:text-black/40"
-                  />
-                </div>
+          {/* Macbook Body Container */}
+          <div className="flex flex-col md:flex-row h-auto md:h-[580px] bg-white/70 text-slate-900">
+            {/* Left Device Selection Aside */}
+            <aside className="w-full md:w-72 border-r border-black/5 bg-slate-50/60 p-4 flex flex-col shrink-0">
+              <div className="relative mb-3">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search family devices..."
+                  className="w-full h-9 pl-9 pr-4 rounded-xl bg-white border border-black/5 text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500/20 text-slate-900 placeholder:text-slate-400"
+                />
               </div>
 
-              <div className="flex-1 overflow-y-auto px-2 space-y-1 pb-4">
+              <div className="space-y-1.5 flex-1 overflow-y-auto">
                 <div
                   onClick={() => setActiveTab('senior')}
-                  className={`p-2.5 rounded-xl flex items-center gap-3 cursor-pointer transition-colors ${
-                    activeTab === 'senior' ? 'bg-black/10' : 'hover:bg-black/5'
+                  className={`p-3 rounded-2xl flex items-center gap-3 cursor-pointer transition-all ${
+                    activeTab === 'senior'
+                      ? 'bg-white shadow-xs border border-black/5'
+                      : 'hover:bg-black/[0.03]'
                   }`}
                 >
-                  <div className="w-10 h-10 rounded-full bg-[#885CF5] flex items-center justify-center text-white font-bold shrink-0">
-                    M
+                  <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-xs">
+                    T
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-baseline">
-                      <h4 className="text-sm font-semibold truncate text-slate-900">Margaret&apos;s iPad</h4>
-                      <span className="text-[10px] text-black/40">12:44 PM</span>
+                      <h4 className="text-xs font-bold truncate text-slate-900">Mr. Thomas&apos;s iPad</h4>
+                      <span className="text-[10px] text-slate-400">12:44 PM</span>
                     </div>
-                    <p className="text-xs text-black/60 truncate">Active on Amazon.com</p>
+                    <p className="text-[11px] text-emerald-600 font-medium truncate flex items-center gap-1 mt-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                      Active on Amazon.com
+                    </p>
                   </div>
                 </div>
 
                 <div
                   onClick={() => setActiveTab('guardian')}
-                  className={`p-2.5 rounded-xl flex items-center gap-3 cursor-pointer transition-colors ${
-                    activeTab === 'guardian' ? 'bg-black/10' : 'hover:bg-black/5'
+                  className={`p-3 rounded-2xl flex items-center gap-3 cursor-pointer transition-all ${
+                    activeTab === 'guardian'
+                      ? 'bg-white shadow-xs border border-black/5'
+                      : 'hover:bg-black/[0.03]'
                   }`}
                 >
-                  <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold shrink-0">
-                    J
+                  <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-xs">
+                    M
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-baseline">
-                      <h4 className="text-sm font-semibold truncate text-slate-900">John&apos;s Desktop</h4>
-                      <span className="text-[10px] text-black/40">Yesterday</span>
+                      <h4 className="text-xs font-bold truncate text-slate-900">Maya&apos;s MacBook</h4>
+                      <span className="text-[10px] text-slate-400">Yesterday</span>
                     </div>
-                    <p className="text-xs text-black/60 truncate">3 pending approvals</p>
+                    <p className="text-[11px] text-slate-500 truncate mt-0.5">1 pending review request</p>
                   </div>
                 </div>
               </div>
+
+              {/* Status footer inside aside */}
+              <div className="pt-3 border-t border-black/5 flex items-center justify-between text-[11px] text-slate-400">
+                <span>SafePay Network</span>
+                <span className="text-emerald-600 font-semibold">Protected</span>
+              </div>
             </aside>
 
-            {/* Main Stage Area */}
-            <main className="flex-1 flex flex-col relative overflow-hidden bg-[#fbfbfb]">
+            {/* Main Stage Display */}
+            <main className="flex-1 flex flex-col justify-between overflow-hidden bg-white/40">
               {activeTab === 'senior' ? (
-                /* TAB 1: SENIOR EXPERIENCE */
+                /* SCREEN 1: SENIOR EXPERIENCE */
                 <div className="flex-1 flex flex-col justify-between h-full">
-                  <div className="p-6 flex-1 overflow-y-auto space-y-6">
+                  <div className="p-6 md:p-8 flex-1 overflow-y-auto space-y-6">
                     {/* Assistant Message Bubble */}
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-3.5 max-w-lg">
                       <div
                         id="chat-mascot"
-                        className={`w-10 h-10 rounded-full relative shrink-0 transition-all duration-500 shadow-xs flex items-center justify-center ${
-                          paymentStatus === 'completed' ? 'bg-emerald-600 scale-110' : 'bg-[#0a0a0a]'
+                        className={`w-9 h-9 rounded-full relative shrink-0 transition-all duration-300 flex items-center justify-center shadow-xs ${
+                          paymentStatus === 'completed' ? 'bg-emerald-600 scale-105' : 'bg-slate-950'
                         }`}
                       >
                         <div className="flex items-center justify-center gap-1">
@@ -459,28 +342,30 @@ export default function HomePage() {
                           <div className="w-1 h-2 bg-white rounded-full" />
                         </div>
                       </div>
-                      <div className="bg-white border border-black/10 rounded-2xl p-4 shadow-xs max-w-md">
-                        <p className="text-sm text-slate-800 leading-relaxed">
-                          Hi Margaret! I noticed you&apos;re looking at a new gardening kit on Amazon. It&apos;s listed
+                      <div className="bg-white border border-black/5 rounded-2xl p-4 shadow-xs">
+                        <p className="text-xs sm:text-sm text-slate-800 leading-relaxed">
+                          Hi Thomas! I noticed you&apos;re looking at a gardening tool set on Amazon. It&apos;s listed
                           for $45.99. Would you like me to help you pay for this safely?
                         </p>
                       </div>
                     </div>
 
-                    {/* Verified Secure Connection Box */}
-                    <div className="ml-0 md:ml-14 bg-white border-2 border-dashed border-black/10 rounded-2xl p-8 flex flex-col items-center justify-center text-center gap-4 shadow-2xs">
-                      <div className="w-16 h-16 bg-[#1f8a65]/10 rounded-full flex items-center justify-center">
-                        <CheckCircle2 className="w-9 h-9 text-[#1f8a65]" />
+                    {/* Verified Connection Box with Apple Liquid Card */}
+                    <div className="ml-0 md:ml-12 liquid-glass rounded-2xl p-6 sm:p-8 flex flex-col items-center justify-center text-center gap-3.5 border border-white/90 shadow-sm max-w-md">
+                      <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center">
+                        <CheckCircle2 className="w-8 h-8 text-emerald-600" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-black/40">Verified Secure Connection</p>
-                        <h3 className="text-3xl font-bold text-slate-900">$45.99</h3>
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                          Verified Secure Connection
+                        </p>
+                        <h3 className="text-3xl font-extrabold text-slate-950 mt-1">$45.99</h3>
                       </div>
 
                       {paymentStatus === 'idle' && (
                         <button
                           onClick={handlePayment}
-                          className="btn-pill btn-primary w-full max-w-xs h-12 font-bold text-base shadow-sm hover:scale-[1.02]"
+                          className="w-full max-w-xs py-3 rounded-full bg-slate-950 text-white font-semibold text-sm shadow-sm hover:bg-slate-800 active:scale-[0.98] transition-all"
                         >
                           Confirm Payment
                         </button>
@@ -489,34 +374,34 @@ export default function HomePage() {
                       {paymentStatus === 'verifying' && (
                         <button
                           disabled
-                          className="btn-pill btn-primary w-full max-w-xs h-12 font-bold text-base opacity-75 cursor-wait flex items-center justify-center gap-2"
+                          className="w-full max-w-xs py-3 rounded-full bg-slate-950 text-white font-semibold text-sm opacity-80 cursor-wait flex items-center justify-center gap-2"
                         >
-                          <RefreshCw className="w-4 h-4 animate-spin text-black" />
+                          <RefreshCw className="w-4 h-4 animate-spin text-white" />
                           <span>Verifying with PayPal...</span>
                         </button>
                       )}
 
                       {paymentStatus === 'completed' && (
-                        <div className="flex items-center gap-2 py-2 animate-fadeIn">
-                          <span className="bg-[#1f8a65] text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                        <div className="flex items-center gap-2 py-1 animate-fadeIn">
+                          <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-xs">
                             <span className="w-1.5 h-1.5 bg-white rounded-full" /> DONE
                           </span>
-                          <p className="text-xs font-medium text-[#1f8a65]">
-                            Payment sent & verified by your son David.
+                          <p className="text-xs font-semibold text-emerald-700">
+                            Payment sent & verified by your daughter Maya.
                           </p>
                         </div>
                       )}
 
-                      <p className="text-[10px] uppercase tracking-widest text-black/30 font-bold">
+                      <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
                         Secured by Guardian Oversight
                       </p>
                     </div>
                   </div>
 
-                  {/* Contextual Bottom Search Bar */}
-                  <div className="p-4 border-t border-black/5 bg-white">
-                    <div className="flex items-center gap-3 bg-[#f5f5f5] rounded-full px-5 py-3 border border-black/5">
-                      <span className="text-sm text-black/40">Ask me anything about this payment...</span>
+                  {/* Context Bar at Bottom */}
+                  <div className="p-4 border-t border-black/5 bg-white/70 backdrop-blur-md">
+                    <div className="flex items-center gap-3 bg-slate-50 rounded-full px-5 py-2.5 border border-black/5">
+                      <span className="text-xs text-slate-500">Ask me anything about this payment...</span>
                       <div className="ml-auto flex gap-1 items-center">
                         <div className="w-1.5 h-1.5 bg-orange-500 rounded-full orange-pulse" />
                         <div
@@ -527,94 +412,94 @@ export default function HomePage() {
                           className="w-1.5 h-1.5 bg-orange-500 rounded-full orange-pulse"
                           style={{ animationDelay: '0.4s' }}
                         />
-                        <span className="text-[10px] font-bold text-orange-500 ml-2">RECEIVING CONTEXT</span>
+                        <span className="text-[10px] font-bold text-orange-600 ml-1.5">RECEIVING CONTEXT</span>
                       </div>
                     </div>
                   </div>
                 </div>
               ) : (
-                /* TAB 2: GUARDIAN PANEL */
-                <div className="flex-1 flex flex-col p-6 space-y-6 overflow-y-auto">
+                /* SCREEN 2: GUARDIAN PANEL */
+                <div className="flex-1 flex flex-col p-6 sm:p-8 space-y-6 overflow-y-auto">
                   <div className="flex justify-between items-center">
                     <div>
-                      <h2 className="text-xl font-bold text-slate-900">Oversight Dashboard</h2>
-                      <p className="text-sm text-black/50">Monitoring Margaret&apos;s activity</p>
+                      <h2 className="text-lg font-bold text-slate-950">Oversight Dashboard</h2>
+                      <p className="text-xs text-slate-500">Monitoring Mr. Thomas&apos;s activity</p>
                     </div>
-                    <div className="flex gap-2">
-                      <span className="h-6 px-3 bg-green-100 text-green-700 rounded-full text-[11px] font-bold flex items-center">
-                        LIVE
+                    <div className="flex items-center gap-2">
+                      <span className="h-6 px-3 bg-emerald-100 text-emerald-800 rounded-full text-[11px] font-bold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> LIVE
                       </span>
                       <button
                         onClick={() => setIsChatOpen(true)}
-                        className="btn-pill bg-black/5 w-8 h-8 hover:bg-black/10 flex items-center justify-center"
-                        title="Caregiver AI Settings"
+                        className="w-8 h-8 rounded-full bg-black/5 hover:bg-black/10 flex items-center justify-center transition-colors"
+                        title="AI Companion Settings"
                       >
-                        <Settings className="w-4 h-4 text-black/70" />
+                        <Settings className="w-4 h-4 text-slate-600" />
                       </button>
                     </div>
                   </div>
 
-                  {/* Stat Card */}
+                  {/* Stat Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-4 bg-white border border-black/5 rounded-2xl shadow-xs">
-                      <p className="text-xs font-bold text-black/30 uppercase tracking-wider mb-2">Today&apos;s Spend</p>
-                      <p className="text-2xl font-bold text-slate-900">$112.40</p>
-                      <div className="mt-4 h-1.5 w-full bg-black/5 rounded-full overflow-hidden">
-                        <div className="h-full bg-[#885CF5] w-2/3" />
+                    <div className="liquid-glass p-5 rounded-2xl border border-white/80">
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Today&apos;s Spend</p>
+                      <p className="text-2xl font-extrabold text-slate-950">$112.40</p>
+                      <div className="mt-3.5 h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-purple-600 w-2/3 rounded-full" />
                       </div>
                     </div>
-                    <div className="p-4 bg-white border border-black/5 rounded-2xl shadow-xs">
-                      <p className="text-xs font-bold text-black/30 uppercase tracking-wider mb-2">Protection Cap</p>
-                      <p className="text-2xl font-bold text-slate-900">$2,500.00</p>
+                    <div className="liquid-glass p-5 rounded-2xl border border-white/80">
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Protection Cap</p>
+                      <p className="text-2xl font-extrabold text-slate-950">$2,500.00</p>
                       <p className="text-xs text-emerald-600 font-semibold mt-2">Zero anomalous spikes detected</p>
                     </div>
                   </div>
 
-                  {/* Verification Requests Card */}
-                  <div className="bg-white border border-black/5 rounded-2xl p-4 shadow-xs">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-sm font-bold text-slate-900">Recent Verification Requests</h3>
+                  {/* Recent Verification Request */}
+                  <div className="liquid-glass rounded-2xl p-5 border border-white/80 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        Recent Verification Request
+                      </h3>
                       <button
                         onClick={() => setIsChatOpen(true)}
-                        className="text-[11px] text-[#0a84ff] font-semibold px-2 py-1 hover:bg-blue-50 rounded"
+                        className="text-xs font-semibold text-purple-600 hover:text-purple-700"
                       >
                         Ask AI Assistant
                       </button>
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-[#fbfbfb] border border-black/5 rounded-xl gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 bg-orange-100 rounded-lg flex items-center justify-center shrink-0">
-                            <ShoppingCart className="w-4 h-4 text-orange-600" />
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold text-slate-900">Amazon.com</p>
-                            <p className="text-[10px] text-black/40">Gardening Kit • $45.99</p>
-                          </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-white/60 rounded-xl border border-black/5 gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+                          <ShoppingCart className="w-4 h-4" />
                         </div>
-
-                        {recentAction ? (
-                          <span className="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-700">
-                            {recentAction}
-                          </span>
-                        ) : (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setRecentAction('Approved by You')}
-                              className="btn-pill btn-primary h-8 px-4 text-xs font-semibold"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => setRecentAction('Flagged for Review')}
-                              className="btn-pill btn-destructive h-8 px-4 text-xs font-semibold"
-                            >
-                              Flag
-                            </button>
-                          </div>
-                        )}
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">Amazon.com</p>
+                          <p className="text-[11px] text-slate-500">Gardening Kit • $45.99</p>
+                        </div>
                       </div>
+
+                      {recentAction ? (
+                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-700">
+                          {recentAction}
+                        </span>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setRecentAction('Approved by Maya')}
+                            className="px-4 py-1.5 rounded-full bg-slate-950 text-white text-xs font-semibold hover:bg-slate-800 active:scale-95 transition-all"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => setRecentAction('Flagged for Review')}
+                            className="px-4 py-1.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold hover:bg-rose-100 active:scale-95 transition-all"
+                          >
+                            Flag
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -624,11 +509,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* STATEMENT SECTION WITH GIANT INTERACTIVE MASCOT */}
-      <section className="px-6 py-16 max-w-7xl mx-auto">
-        <div className="relative bg-[#1a1a1a] min-h-[22rem] rounded-3xl p-8 sm:p-14 overflow-hidden flex flex-col justify-center border border-white/5">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold leading-tight max-w-2xl text-white">
-            SafePay acts as an <span className="text-[#7e8083]">invisible safety net</span> that grows more intuitive
+      {/* STATEMENT SECTION WITH GIANT INTERACTIVE MASCOT (Liquid Glass Banner) */}
+      <section className="px-6 py-12 max-w-6xl mx-auto">
+        <div className="relative liquid-glass rounded-3xl p-8 sm:p-14 overflow-hidden flex flex-col justify-center border border-white/80 shadow-md">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-semibold leading-tight max-w-2xl text-slate-950 tracking-tight">
+            SafePay acts as an <span className="text-slate-500">invisible safety net</span> that grows more intuitive
             with every interaction.
           </h2>
 
@@ -636,82 +521,84 @@ export default function HomePage() {
           <div
             ref={statementMascotRef}
             id="statement-mascot"
-            className="absolute -bottom-10 -right-10 w-44 h-44 sm:w-48 sm:h-48 bg-white rounded-full shadow-[0_32px_64px_rgba(0,0,0,0.5)] cursor-pointer mascot-container active:scale-95 transition-transform"
+            className="absolute -bottom-8 -right-8 w-40 h-40 sm:w-48 sm:h-48 bg-white rounded-full shadow-[0_24px_48px_rgba(0,0,0,0.12)] cursor-pointer mascot-container active:scale-95 transition-transform border border-white/80"
           >
             <div className="absolute top-1/3 left-1/2 -translate-x-1/2 flex items-center gap-3.5 sm:gap-4">
-              <div className="mascot-eye w-2.5 h-6 sm:w-3 sm:h-7 bg-black rounded-full" />
-              <div className="mascot-eye w-2.5 h-6 sm:w-3 sm:h-7 bg-black rounded-full" />
+              <div className="mascot-eye w-2.5 h-6 sm:w-3 sm:h-7 bg-slate-950 rounded-full" />
+              <div className="mascot-eye w-2.5 h-6 sm:w-3 sm:h-7 bg-slate-950 rounded-full" />
             </div>
           </div>
         </div>
       </section>
 
-      {/* 3 FEATURE CARDS GRID */}
-      <section id="how-it-works" className="px-6 py-16 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      {/* 3 LIQUID GLASS FEATURE CARDS */}
+      <section id="how-it-works" className="px-6 py-12 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Card 1: Multi-Guardian Oversight */}
-          <div className="bg-[#1a1a1a] border border-white/5 p-8 rounded-3xl group hover:border-white/10 transition-all flex flex-col justify-between">
+          <div className="liquid-glass p-8 rounded-3xl border border-white/80 shadow-sm flex flex-col justify-between hover:translate-y-[-2px] transition-all">
             <div>
-              <div className="flex -space-x-3 mb-6">
-                <div className="w-10 h-10 rounded-full bg-orange-400 border-2 border-[#1a1a1a] flex items-center justify-center text-xs font-bold text-white shadow-xs">
+              <div className="flex -space-x-2.5 mb-6">
+                <div className="w-10 h-10 rounded-full bg-amber-400 border-2 border-white flex items-center justify-center text-xs font-bold text-white shadow-xs">
                   M
                 </div>
-                <div className="w-10 h-10 rounded-full bg-blue-400 border-2 border-[#1a1a1a] flex items-center justify-center text-xs font-bold text-white shadow-xs">
+                <div className="w-10 h-10 rounded-full bg-blue-500 border-2 border-white flex items-center justify-center text-xs font-bold text-white shadow-xs">
                   D
                 </div>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-white">Multi-Guardian Oversight</h3>
-              <p className="text-[#7e8083] text-sm leading-relaxed mb-6">
+              <h3 className="text-lg font-bold text-slate-950 mb-2">Multi-Guardian Oversight</h3>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-6">
                 Connect siblings or caregivers to a shared dashboard. Everyone stays informed, no one gets overwhelmed.
               </p>
             </div>
             <button
-              onClick={() => switchPersona('maya')}
-              className="btn-pill btn-secondary w-full py-3 text-sm font-semibold text-white flex items-center justify-center gap-2"
+              onClick={() => {
+                switchPersona('maya').then(() => setIsChatOpen(true));
+              }}
+              className="liquid-pill w-full py-2.5 text-xs font-semibold text-slate-900 flex items-center justify-center gap-2"
             >
-              <Users className="w-4 h-4" />
+              <Users className="w-3.5 h-3.5" />
               <span>Add Guardian</span>
             </button>
           </div>
 
           {/* Card 2: Smart Handover */}
-          <div className="bg-[#1a1a1a] border border-white/5 p-8 rounded-3xl group hover:border-white/10 transition-all flex flex-col justify-between">
+          <div className="liquid-glass p-8 rounded-3xl border border-white/80 shadow-sm flex flex-col justify-between hover:translate-y-[-2px] transition-all">
             <div>
               <div className="mb-6 h-10 flex items-center">
-                <div className="btn-pill btn-secondary px-3 py-1 text-xs font-medium text-[#d5dbe6] flex items-center gap-2">
-                  <MousePointerClick className="w-3.5 h-3.5 text-blue-400" />
+                <span className="liquid-pill px-3 py-1 text-xs font-medium text-slate-700 flex items-center gap-1.5">
+                  <MousePointerClick className="w-3.5 h-3.5 text-purple-600" />
                   <span>Handover active</span>
-                </div>
+                </span>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-white">Smart Handover</h3>
-              <p className="text-[#7e8083] text-sm leading-relaxed mb-6">
+              <h3 className="text-lg font-bold text-slate-950 mb-2">Smart Handover</h3>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-6">
                 When SafePay detects complex checkout flows, it smoothly hands over to a guardian with a 0.52s crossfade.
               </p>
             </div>
-            <div className="relative h-20 bg-black/20 rounded-2xl flex items-center justify-center border border-white/5">
-              <div className="flex items-center gap-4 transition-all duration-500">
-                <div className="p-3 bg-white/5 rounded-xl border border-white/10">
-                  <ShoppingBag className="w-5 h-5 text-white/40" />
+            <div className="relative h-16 bg-black/[0.03] rounded-2xl flex items-center justify-center border border-black/5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white rounded-xl shadow-2xs">
+                  <ShoppingBag className="w-4 h-4 text-slate-600" />
                 </div>
-                <ArrowRight className="w-4 h-4 text-white/30" />
-                <div className="p-3 bg-blue-500/20 rounded-xl border border-blue-400/30">
-                  <ShieldCheck className="w-5 h-5 text-blue-400" />
+                <ArrowRight className="w-4 h-4 text-slate-400" />
+                <div className="p-2.5 bg-purple-50 rounded-xl border border-purple-200">
+                  <ShieldCheck className="w-4 h-4 text-purple-700" />
                 </div>
               </div>
             </div>
           </div>
 
           {/* Card 3: Caregiver Voice AI Assistant */}
-          <div className="bg-[#1a1a1a] border border-white/5 p-8 rounded-3xl group hover:border-white/10 transition-all flex flex-col justify-between">
+          <div className="liquid-glass p-8 rounded-3xl border border-white/80 shadow-sm flex flex-col justify-between hover:translate-y-[-2px] transition-all">
             <div>
               <div className="mb-6 h-10 flex items-center">
-                <div className="btn-pill btn-secondary px-3 py-1 text-xs font-medium text-emerald-400 flex items-center gap-2 border-emerald-500/30">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="liquid-pill px-3 py-1 text-xs font-medium text-emerald-800 bg-emerald-50/80 flex items-center gap-1.5 border border-emerald-200">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Voice AI Active</span>
-                </div>
+                </span>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-white">Voice & Chat Companion</h3>
-              <p className="text-[#7e8083] text-sm leading-relaxed mb-6">
+              <h3 className="text-lg font-bold text-slate-950 mb-2">Voice & Chat Companion</h3>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-6">
                 Maya & David can speak directly with the AI assistant to query transaction risks and draft respectful
                 messages to Dad.
               </p>
@@ -720,24 +607,26 @@ export default function HomePage() {
               onClick={() => {
                 switchPersona('maya').then(() => setIsChatOpen(true));
               }}
-              className="btn-pill btn-primary w-full py-3 text-sm font-semibold flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-full bg-slate-950 text-white text-xs font-semibold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-xs"
             >
-              <Volume2 className="w-4 h-4" />
+              <Volume2 className="w-3.5 h-3.5" />
               <span>Talk with SafePay AI</span>
             </button>
           </div>
         </div>
       </section>
 
-      {/* COMMON QUESTIONS ACCORDION */}
-      <section id="faq" className="px-6 py-24 max-w-3xl mx-auto">
-        <h2 className="text-3xl md:text-4xl font-bold text-center mb-14 tracking-tight text-white">Common Questions</h2>
+      {/* FAQ SECTION (Clean Liquid Accordions) */}
+      <section id="faq" className="px-6 py-20 max-w-3xl mx-auto">
+        <h2 className="text-2xl sm:text-3xl font-bold text-center mb-12 tracking-tight text-slate-950">
+          Common Questions
+        </h2>
 
-        <div className="space-y-4">
+        <div className="space-y-3.5">
           {[
             {
               q: 'How does the companion stay with me?',
-              a: 'SafePay lives as a browser extension and a mobile app. It recognizes when you reach a payment screen and automatically pops up to assist without disrupting everyday habits.',
+              a: 'SafePay lives as a browser extension and a mobile companion. It recognizes when you reach a payment screen and automatically pops up to assist without disrupting everyday habits.',
             },
             {
               q: 'Can guardians see all of my purchases?',
@@ -754,20 +643,23 @@ export default function HomePage() {
           ].map((faq, idx) => {
             const isOpen = openFaq === idx;
             return (
-              <div key={idx} className="bg-[#1a1a1a] border border-white/5 rounded-2xl overflow-hidden transition-all">
+              <div
+                key={idx}
+                className="liquid-glass rounded-2xl overflow-hidden transition-all border border-white/80"
+              >
                 <button
                   onClick={() => setOpenFaq(isOpen ? null : idx)}
-                  className="w-full px-6 py-5 flex items-center justify-between text-left hover:bg-white/2 transition-colors"
+                  className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-white/40 transition-colors"
                 >
-                  <span className="font-semibold text-sm sm:text-base text-white">{faq.q}</span>
+                  <span className="font-semibold text-sm text-slate-900">{faq.q}</span>
                   <ChevronDown
-                    className={`w-4 h-4 text-[#7e8083] transition-transform duration-200 ${
+                    className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
                       isOpen ? 'rotate-180' : ''
                     }`}
                   />
                 </button>
                 {isOpen && (
-                  <div className="px-6 pb-5 text-[#7e8083] text-sm leading-relaxed border-t border-white/5 pt-3">
+                  <div className="px-6 pb-5 text-slate-600 text-xs sm:text-sm leading-relaxed border-t border-black/5 pt-3">
                     {faq.a}
                   </div>
                 )}
@@ -777,123 +669,50 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* FOOTER WITH GIANT CIRCULAR STROKE */}
-      <footer className="relative px-6 pt-32 pb-16 overflow-hidden border-t border-white/5">
-        {/* Faded Circular Watermark */}
-        <div className="absolute bottom-[-15%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] pointer-events-none opacity-[0.15] mask-fade">
-          <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-            <circle cx="50" cy="50" r="48" stroke="white" strokeWidth="1.5" />
-          </svg>
-        </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-12 mb-20">
-            <div className="col-span-2">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-xs">
-                  <ShieldCheck className="w-5 h-5 text-black" />
-                </div>
-                <span className="font-bold tracking-tight text-xl text-white">SafePay</span>
-              </div>
-              <p className="text-xs text-[#7e8083] max-w-xs leading-relaxed">
-                Rules decide. AI explains. People remain in control. Built for the PayPal AI Hackathon.
-              </p>
+      {/* MINIMAL FOOTER */}
+      <footer className="px-6 pt-16 pb-12 border-t border-black/5 text-xs text-slate-500">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-slate-950 text-white flex items-center justify-center">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
             </div>
-
-            <div>
-              <div className="text-xs font-semibold text-white uppercase tracking-wider mb-4">Product</div>
-              <ul className="space-y-2.5 text-xs text-[#7e8083]">
-                <li>Senior Experience</li>
-                <li>Guardian Panel</li>
-                <li>PayPal REST v2</li>
-                <li>Gemini Context Engine</li>
-              </ul>
-            </div>
-
-            <div>
-              <div className="text-xs font-semibold text-white uppercase tracking-wider mb-4">Architecture</div>
-              <ul className="space-y-2.5 text-xs text-[#7e8083]">
-                <li>PostgreSQL 16</li>
-                <li>Next.js 15 App Router</li>
-                <li>Prisma ORM</li>
-                <li>Vitest Suite (19/19)</li>
-              </ul>
-            </div>
-
-            <div>
-              <div className="text-xs font-semibold text-white uppercase tracking-wider mb-4">Personas</div>
-              <ul className="space-y-2.5 text-xs text-[#7e8083]">
-                <li onClick={() => switchPersona('thomas')} className="cursor-pointer hover:text-white">
-                  Mr. Thomas (Elder)
-                </li>
-                <li onClick={() => switchPersona('maya')} className="cursor-pointer hover:text-white">
-                  Maya (Approver)
-                </li>
-                <li onClick={() => switchPersona('david')} className="cursor-pointer hover:text-white">
-                  David (Approver)
-                </li>
-                <li onClick={() => switchPersona('sarah')} className="cursor-pointer hover:text-white">
-                  Sarah (View-Only)
-                </li>
-              </ul>
-            </div>
+            <span className="font-bold text-slate-900 text-sm">SafePay</span>
+            <span className="text-slate-400 text-xs ml-2">© 2026 SafePay Technologies Inc.</span>
           </div>
 
-          <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-[#7e8083]">
-            <p>© 2026 SafePay Technologies Inc. All rights reserved.</p>
-            <div className="flex items-center gap-6">
-              <span>Privacy Policy</span>
-              <span>Terms of Service</span>
-              <span>Security Whitepaper</span>
-            </div>
+          <div className="flex items-center gap-5 text-slate-500 text-xs">
+            <span
+              onClick={() => switchPersona('maya')}
+              className="cursor-pointer hover:text-slate-900 transition-colors"
+            >
+              Maya (Caregiver)
+            </span>
+            <span
+              onClick={() => switchPersona('thomas')}
+              className="cursor-pointer hover:text-slate-900 transition-colors"
+            >
+              Mr. Thomas (Elder)
+            </span>
+            <span
+              onClick={() => switchPersona('david')}
+              className="cursor-pointer hover:text-slate-900 transition-colors"
+            >
+              David (Caregiver)
+            </span>
+            <span
+              onClick={() => switchPersona('sarah')}
+              className="cursor-pointer hover:text-slate-900 transition-colors"
+            >
+              Sarah (Auditor)
+            </span>
           </div>
         </div>
       </footer>
 
-      {/* FLOATING COOKIE PREFERENCES BANNER */}
-      {showCookies && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#1b1b1b] p-6 rounded-3xl w-[360px] border border-white/10 shadow-2xl transition-all duration-500 animate-fadeIn">
-          <div className="flex items-start justify-between mb-2">
-            <h4 className="font-bold text-sm text-white">Cookie Preferences</h4>
-            <button
-              onClick={() => setShowCookies(false)}
-              className="p-1 rounded-lg hover:bg-white/10 text-white/40 hover:text-white"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <p className="text-xs text-[#7e8083] mb-5 leading-relaxed">
-            We use essential cookies to maintain secure sessions and prevent unauthorized transactions.
-          </p>
-          <div className="flex flex-col gap-2.5">
-            <button
-              onClick={() => setShowCookies(false)}
-              className="btn-pill btn-primary h-10 text-xs font-bold"
-            >
-              Accept All Cookies
-            </button>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setShowCookies(false)}
-                className="btn-pill btn-secondary h-9 text-xs"
-              >
-                Reject Non-Essential
-              </button>
-              <button
-                onClick={() => setShowCookies(false)}
-                className="btn-pill btn-secondary h-9 text-xs"
-              >
-                Settings
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* CAREGIVER VOICE & CHAT AI DRAWER */}
       <CaregiverAIChatDrawer
         currentUser={user}
-        elderName={isThomas ? 'Your Account' : 'Margaret (Mr. Thomas)'}
+        elderName={isThomas ? 'Your Account' : 'Mr. Thomas'}
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         onOpen={() => {

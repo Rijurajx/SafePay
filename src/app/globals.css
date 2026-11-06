@@ -3,33 +3,102 @@
 @tailwind utilities;
 
 :root {
-  --bg-color: #0a0a0a;
-  --card-bg: #1a1a1a;
-  --accent-orange: hsl(22, 100%, 51.6%);
-  --accent-purple: hsl(263, 70%, 50.4%);
-  --success-green: hsl(142, 69%, 58%);
+  --bg-color: #fbfbfb;
+  --card-bg: rgba(255, 255, 255, 0.8);
+  --text-primary: #0a0c10;
+  --text-secondary: #5a5f6d;
+  --hairline: rgba(10, 12, 16, 0.08);
 }
 
 body {
   background-color: var(--bg-color);
-  color: white;
+  color: var(--text-primary);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.glass-nav {
-  background: rgba(10, 10, 10, 0.85);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+/* Luminous Soft Color Mesh (inspired by getuni.co) */
+.soft-mesh-bg {
+  background-color: #fbfbfb;
+  background-image: 
+    radial-gradient(circle at 18% 12%, rgba(254, 215, 170, 0.45), transparent 45%),
+    radial-gradient(circle at 82% 16%, rgba(224, 231, 255, 0.55), transparent 50%),
+    radial-gradient(circle at 50% 38%, rgba(251, 207, 232, 0.35), transparent 55%),
+    radial-gradient(circle at 24% 68%, rgba(209, 250, 229, 0.4), transparent 50%),
+    radial-gradient(circle at 76% 78%, rgba(254, 240, 138, 0.3), transparent 45%);
+  background-attachment: fixed;
 }
 
+/* Apple Liquid Glass Material (VisionOS / macOS Sequoia Specular Highlights) */
+.liquid-glass {
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 
+    0 20px 48px -12px rgba(15, 23, 42, 0.08),
+    0 1px 2px 0 rgba(15, 23, 42, 0.04),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.03);
+}
+
+.liquid-glass-subtle {
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 
+    0 10px 30px -8px rgba(15, 23, 42, 0.05),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.liquid-glass-dark {
+  background: rgba(18, 20, 26, 0.82);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 
+    0 24px 64px -16px rgba(0, 0, 0, 0.35),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.2);
+}
+
+.liquid-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(10, 12, 16, 0.08);
+  box-shadow: 
+    0 2px 8px -2px rgba(10, 12, 16, 0.06),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.95);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.liquid-pill:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(10, 12, 16, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px -4px rgba(10, 12, 16, 0.1);
+}
+
+.liquid-pill:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+/* Eye Tracking & Mascot Physics */
 .mascot-eye {
-  transition: transform 0.1s ease-out;
+  transition: transform 0.08s ease-out;
 }
 
 @keyframes bob {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+  50% { transform: translateY(-7px); }
 }
 
 .mascot-bob {
@@ -37,27 +106,10 @@ body {
 }
 
 .mascot-container {
-  transition: all 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.mask-fade {
-  -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
-  mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
-}
-
-.waveform-bar {
-  animation: waveform 1.2s ease-in-out infinite;
-}
-
-@keyframes waveform {
-  0%, 100% { transform: scaleY(0.4); }
-  50% { transform: scaleY(1); }
-}
-
-.perspective-text {
-  perspective: 1200px;
-}
-
+/* Pulsing Context Indicators */
 .orange-pulse {
   animation: pulse 1.5s infinite;
 }
@@ -67,54 +119,17 @@ body {
   50% { opacity: 1; }
 }
 
-.btn-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+/* Custom Scrollbar for Drawer & Windows */
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(10, 12, 16, 0.15);
   border-radius: 9999px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-  user-select: none;
-  font-weight: 500;
 }
-
-.btn-pill:hover {
-  transform: translateY(-1px);
-}
-
-.btn-pill:active {
-  transform: translateY(1px) scale(0.98);
-}
-
-.btn-primary {
-  background: white;
-  color: black;
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
-}
-
-.btn-primary:hover {
-  background: #f2f2f2;
-  box-shadow: 0 6px 16px rgba(255, 255, 255, 0.15);
-}
-
-.btn-secondary {
-  background: #1b1b1b;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: white;
-}
-
-.btn-secondary:hover {
-  background: #252525;
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.btn-destructive {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.2);
-}
-
-.btn-destructive:hover {
-  background: rgba(239, 68, 68, 0.15);
-  border-color: rgba(239, 68, 68, 0.3);
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(10, 12, 16, 0.3);
 }
