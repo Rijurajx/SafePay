@@ -12,7 +12,18 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const requestedElderId = searchParams.get('elderId') || '11111111-1111-4111-a111-111111111111';
+    let requestedElderId = searchParams.get('elderId');
+    if (!requestedElderId) {
+      if (session.roleDefault === 'PROTECTED_USER') {
+        requestedElderId = session.id;
+      } else {
+        const activeLink = await prisma.familyLink.findFirst({
+          where: { caregiverId: session.id, status: 'ACTIVE' },
+          select: { elderId: true },
+        });
+        requestedElderId = activeLink?.elderId || '11111111-1111-4111-a111-111111111111';
+      }
+    }
 
     const authResult = await authorizeElderDataScope(session, requestedElderId);
     if (!authResult.authorized) {

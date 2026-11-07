@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
 import { Role, FamilyLinkStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import bcrypt from 'bcryptjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,7 @@ export async function POST(req: NextRequest) {
     const {
       elderEmail,
       elderFullName,
+      elderPassword = 'SafePayElder123!',
       relationship = 'Family Member',
       canApprove = true,
       canManage = true,
@@ -46,12 +48,15 @@ export async function POST(req: NextRequest) {
     });
 
     if (!elder) {
+      const passwordHash = await bcrypt.hash(elderPassword || 'SafePayElder123!', 10);
+
       // Create new elder account
       elder = await prisma.user.create({
         data: {
           email: normalizedEmail,
           fullName: elderFullName.trim(),
           roleDefault: Role.PROTECTED_USER,
+          passwordHash,
           isSynthetic: false,
           isActive: true,
         },

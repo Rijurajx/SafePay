@@ -106,6 +106,7 @@ export default function DashboardPage() {
   // Elder Connect form
   const [connectName, setConnectName] = useState('');
   const [connectEmail, setConnectEmail] = useState('');
+  const [connectPassword, setConnectPassword] = useState('SafePayElder123!');
   const [connectRelationship, setConnectRelationship] = useState('Father');
   const [connectThreshold, setConnectThreshold] = useState('100');
   const [connectDailyCap, setConnectDailyCap] = useState('1000');
@@ -228,6 +229,29 @@ export default function DashboardPage() {
     }
   };
 
+  const handleSwitchFamily = async (targetUserId: string) => {
+    setRefreshing(true);
+    setActionNotice(null);
+    try {
+      const res = await fetch('/api/auth/switch-family', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setActionNotice({ message: data.message || 'Switched account view', type: 'success' });
+        await fetchSummary();
+      } else {
+        setActionNotice({ message: data.error || 'Failed to switch view', type: 'error' });
+      }
+    } catch {
+      setActionNotice({ message: 'Error switching family view', type: 'error' });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const handleConnectElder = async (e: React.FormEvent) => {
     e.preventDefault();
     setConnectSubmitting(true);
@@ -241,6 +265,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           elderEmail: connectEmail,
           elderFullName: connectName,
+          elderPassword: connectPassword,
           relationship: connectRelationship,
           approvalThreshold: parseFloat(connectThreshold) || 100,
           dailyCap: parseFloat(connectDailyCap) || 1000,
@@ -254,7 +279,7 @@ export default function DashboardPage() {
       if (!res.ok) {
         setConnectError(data.error || 'Failed to connect elder');
       } else {
-        setConnectSuccess(`Successfully connected ${connectName} to your SafePay guardian circle!`);
+        setConnectSuccess(`Successfully connected ${connectName}! Credentials saved. SafePay protections active.`);
         setTimeout(() => {
           setIsConnectModalOpen(false);
           setConnectName('');
@@ -428,6 +453,25 @@ export default function DashboardPage() {
 
               {/* Quick Actions & Add Elder */}
               <div className="flex flex-wrap items-center gap-3">
+                {activeElder && (
+                  <>
+                    <Link
+                      href={`/checkout?elderId=${activeElder.id}`}
+                      className="liquid-pill px-3.5 py-2 text-xs font-semibold text-slate-900 flex items-center gap-1.5 shadow-2xs hover:bg-white active:scale-95 transition-all"
+                    >
+                      <ShoppingBag className="w-4 h-4 text-emerald-600" />
+                      <span>Simulate Checkout as {activeElder.fullName}</span>
+                    </Link>
+                    <button
+                      onClick={() => handleSwitchFamily(activeElder.id)}
+                      className="liquid-pill px-3.5 py-2 text-xs font-semibold text-slate-900 flex items-center gap-1.5 shadow-2xs hover:bg-white active:scale-95 transition-all"
+                      title="Switch session to experience SafePay through the senior's perspective"
+                    >
+                      <Eye className="w-4 h-4 text-purple-600" />
+                      <span>Switch to Senior View</span>
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={() => setIsConnectModalOpen(true)}
                   className="liquid-pill px-4 py-2 text-xs font-semibold text-slate-900 flex items-center gap-1.5 shadow-2xs hover:bg-white active:scale-95 transition-all"
@@ -756,7 +800,17 @@ export default function DashboardPage() {
                       : 'Maya and David are linked to confirm unusual or large payments.'}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {seniorGuardians.length > 0 && (
+                    <button
+                      onClick={() => handleSwitchFamily(seniorGuardians[0].id)}
+                      className="liquid-pill px-3 py-1 text-xs font-semibold text-slate-800 flex items-center gap-1 shadow-2xs hover:bg-white"
+                      title="Switch session to experience Guardian approval mode"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Switch to Caregiver View</span>
+                    </button>
+                  )}
                   <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-900 border border-purple-200">
                     Threshold: ${seniorFamilyThreshold.toFixed(0)}
                   </span>
@@ -936,6 +990,23 @@ export default function DashboardPage() {
                   onChange={(e) => setConnectEmail(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl bg-white/80 border border-slate-200 text-xs focus:ring-2 focus:ring-purple-600 outline-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Senior Account Password
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. SafePayElder123!"
+                  value={connectPassword}
+                  onChange={(e) => setConnectPassword(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-white/80 border border-slate-200 text-xs focus:ring-2 focus:ring-purple-600 outline-none font-mono"
+                />
+                <span className="text-[10px] text-slate-500">
+                  Password the senior can use to log into their account
+                </span>
               </div>
 
               <div>

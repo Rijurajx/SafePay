@@ -23,8 +23,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    // Default to Thomas if not provided
-    const targetElderId = requestedElderId || '11111111-1111-4111-a111-111111111111';
+    // Resolve target elder intelligently
+    let targetElderId = requestedElderId;
+    if (!targetElderId) {
+      const activeLink = await prisma.familyLink.findFirst({
+        where: { caregiverId: session.id, status: 'ACTIVE' },
+        select: { elderId: true },
+      });
+      targetElderId = activeLink?.elderId || '11111111-1111-4111-a111-111111111111';
+    }
 
     // Verify caregiver relationship and view permissions
     const familyLink = await prisma.familyLink.findUnique({

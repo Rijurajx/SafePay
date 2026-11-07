@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ShieldCheck,
   ExternalLink,
@@ -13,8 +13,9 @@ import {
   ArrowLeft,
   Store,
   CreditCard,
+  UserCheck,
 } from 'lucide-react';
-import { DemoPersonaKey, SessionUser } from '@/types';
+import { SessionUser } from '@/types';
 
 interface PresetItem {
   id: string;
@@ -65,9 +66,19 @@ const PRESET_SCENARIOS: PresetItem[] = [
   },
 ];
 
-export default function CheckoutPage() {
+interface LinkedElderOption {
+  id: string;
+  fullName: string;
+  email: string;
+}
+
+function CheckoutContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
+  const [linkedElders, setLinkedElders] = useState<LinkedElderOption[]>([]);
+  const [selectedElderId, setSelectedElderId] = useState<string>('');
+  const [linkedCaregiverId, setLinkedCaregiverId] = useState<string | null>(null);
 
   // Selected cart preset
   const [selectedPresetId, setSelectedPresetId] = useState<string>('pharmacy');
@@ -86,60 +97,81 @@ export default function CheckoutPage() {
     paypalOrderId?: string | null;
   } | null>(null);
 
-  useEffect(() => {
-    async function loadUser() {
-      try {
-        const res = await fetch('/api/auth/session');
-        const data = await res.json();
-        if (data.authenticated && data.user) {
-          setCurrentUser(data.user);
-        } else {
-          // Default switch to Thomas for checkout testing if unauthenticated
-          await fetch('/api/auth/demo-switch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ persona: 'thomas' }),
-          });
-          const res2 = await fetch('/api/auth/session');
-          const data2 = await res2.json();
-          setCurrentUser(data2.user);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    loadUser();
-  }, []);
-
-  const switchPersona = async (key: DemoPersonaKey) => {
+  const loadSession = useCallback(async () => {
     try {
-      await fetch('/api/auth/demo-switch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ persona: key }),
-      });
       const res = await fetch('/api/auth/session');
       const data = await res.json();
-      setCurrentUser(data.user);
+      if (data.authenticated && data.user) {
+        setCurrentUser(data.user);
+
+        if (data.user.roleDefault === 'CAREGIVER') {
+          // Caregiver has links to elders
+          interface RawCaregiverLink {
+            elder?: { id: string; fullName: string; email: string };
+          }
+          const elders: LinkedElderOption[] = (data.caregiverLinks || [])
+            .map((l: RawCaregiverLink) => l.elder)
+            .filter((e: LinkedElderOption | undefined): e is LinkedElderOption => Boolean(e));
+          setLinkedElders(elders);
+
+          const paramElderId = searchParams.get('elderId');
+          if (paramElderId && elders.some((e: LinkedElderOption) => e.id === paramElderId)) {
+            setSelectedElderId(paramElderId);
+          } else if (elders.length > 0) {
+            setSelectedElderId(elders[0].id);
+          }
+        } else {
+          // Protected Senior
+          const primaryCaregiver = data.elderLinks?.[0]?.caregiver;
+          if (primaryCaregiver) {
+            setLinkedCaregiverId(primaryCaregiver.id);
+          }
+          setSelectedElderId(data.user.id);
+        }
+      } else {
+        // Fallback demo switch to Thomas if completely unauthenticated
+        await fetch('/api/auth/demo-switch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ persona: 'thomas' }),
+        });
+        const res2 = await fetch('/api/auth/session');
+        const data2 = await res2.json();
+        setCurrentUser(data2.user);
+        setSelectedElderId(data2.user?.id || '11111111-1111-4111-a111-111111111111');
+      }
     } catch (e) {
-      console.error(e);
+      console.error('Failed to load session for checkout:', e);
     }
-  };
+  }, [searchParams]);
+
+  useEffect(() => {
+    loadSession();
+  }, [loadSession]);
 
   const currentScenario =
     PRESET_SCENARIOS.find((p) => p.id === selectedPresetId) || PRESET_SCENARIOS[0];
+
+  const effectiveShopperElder =
+    currentUser?.roleDefault === 'PROTECTED_USER'
+      ? currentUser
+      : linkedElders.find((e) => e.id === selectedElderId) || linkedElders[0];
 
   const handleRunCheckout = async () => {
     setEvaluating(true);
     setEvalResult(null);
     setEvalStep('Checking dual-layer rules against $100 family threshold...');
 
+    const targetElderId =
+      currentUser?.roleDefault === 'PROTECTED_USER' ? currentUser.id : selectedElderId;
+
     try {
-      // Step 1: Run Risk Evaluation API
+      // Step 1: Run Risk Evaluation API with explicit elderId
       const evalRes = await fetch('/api/risk/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          elderId: targetElderId,
           amount: currentScenario.amount,
           merchantName: currentScenario.merchantName,
           category: currentScenario.category,
@@ -187,7 +219,7 @@ export default function CheckoutPage() {
           paymentRequestId: evalData.paymentRequestId,
           seniorMessage:
             evalData.explanation?.seniorExplanation ||
-            "We've paused this charge and notified Maya and David. SafePay keeps your card secure until your family confirms.",
+            "We've paused this charge and notified your family guardian. SafePay keeps your card secure until family confirms.",
           caregiverExplanation: evalData.explanation?.caregiverExplanation,
         });
       }
@@ -200,9 +232,21 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleSwitchToMayaAndReview = async () => {
-    await switchPersona('maya');
-    router.push('/dashboard');
+  const handleSwitchToCaregiverAndReview = async () => {
+    try {
+      if (currentUser?.roleDefault === 'PROTECTED_USER' && linkedCaregiverId) {
+        // Switch to the linked caregiver
+        await fetch('/api/auth/switch-family', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetUserId: linkedCaregiverId }),
+        });
+      }
+      router.push('/dashboard');
+    } catch (e) {
+      console.error(e);
+      router.push('/dashboard');
+    }
   };
 
   return (
@@ -226,11 +270,39 @@ export default function CheckoutPage() {
             </div>
           </div>
 
+          {/* Active Shopper Identity Badge */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 font-medium hidden sm:inline">Active Shopper:</span>
-            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-              {currentUser?.fullName || 'Mr. Thomas (Senior)'}
-            </span>
+            {currentUser?.roleDefault === 'CAREGIVER' ? (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-500 font-medium hidden sm:inline">Simulating for Elder:</span>
+                {linkedElders.length > 1 ? (
+                  <select
+                    value={selectedElderId}
+                    onChange={(e) => setSelectedElderId(e.target.value)}
+                    className="text-xs font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 outline-none"
+                  >
+                    {linkedElders.map((elder) => (
+                      <option key={elder.id} value={elder.id}>
+                        {elder.fullName}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                    <UserCheck className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>{effectiveShopperElder?.fullName || 'Linked Elder'}</span>
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-500 font-medium hidden sm:inline">Active Senior Shopper:</span>
+                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>{currentUser?.fullName || 'Mr. Thomas (Senior)'}</span>
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -245,7 +317,8 @@ export default function CheckoutPage() {
             Simulate Senior Online Shopping
           </h1>
           <p className="text-xs sm:text-sm text-slate-600">
-            Pick a realistic scenario below to see how SafePay&apos;s dual-layer engine protects seniors while keeping routine checkouts effortless.
+            Pick a realistic scenario below to test how SafePay&apos;s dual-layer engine protects{' '}
+            <span className="font-semibold text-slate-900">{effectiveShopperElder?.fullName || 'the senior'}</span> while keeping routine checkouts effortless.
           </p>
         </div>
 
@@ -312,7 +385,8 @@ export default function CheckoutPage() {
             <div className="space-y-0.5">
               <span className="font-bold">SafePay Protective Companion is Active</span>
               <p className="text-slate-600">
-                Rule Engine checks $100 family limit. Gemini AI verifies recipient reputation and flags anomalies.
+                Rule Engine checks $100 family limit. Gemini AI verifies recipient reputation and flags anomalies for{' '}
+                <span className="font-semibold text-slate-900">{effectiveShopperElder?.fullName || 'this account'}</span>.
               </p>
             </div>
           </div>
@@ -433,14 +507,14 @@ export default function CheckoutPage() {
                     </div>
                   )}
 
-                  {/* Call to Action: Switch to Maya & Approve */}
+                  {/* Call to Action: Switch to Caregiver Dashboard & Approve */}
                   <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
                     <button
-                      onClick={handleSwitchToMayaAndReview}
+                      onClick={handleSwitchToCaregiverAndReview}
                       className="w-full sm:w-auto flex-1 py-3.5 px-6 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold text-center flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                      <span>Switch to Maya&apos;s Dashboard to Review & Approve &rarr;</span>
+                      <span>Review & Approve on Guardian Dashboard &rarr;</span>
                     </button>
                     <button
                       onClick={() => {
@@ -458,5 +532,19 @@ export default function CheckoutPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen soft-mesh-bg flex items-center justify-center text-xs font-semibold text-slate-700">
+          Loading Checkout Sandbox...
+        </div>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
   );
 }

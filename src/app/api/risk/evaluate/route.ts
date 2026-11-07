@@ -26,8 +26,19 @@ export async function POST(req: NextRequest) {
       transactionTime: inputTransactionTime,
     } = body;
 
-    // Resolve target elder
-    const elderId = requestedElderId || (session.roleDefault === 'PROTECTED_USER' ? session.id : '11111111-1111-4111-a111-111111111111');
+    // Resolve target elder intelligently
+    let elderId = requestedElderId;
+    if (!elderId) {
+      if (session.roleDefault === 'PROTECTED_USER') {
+        elderId = session.id;
+      } else {
+        const activeLink = await prisma.familyLink.findFirst({
+          where: { caregiverId: session.id, status: 'ACTIVE' },
+          select: { elderId: true },
+        });
+        elderId = activeLink?.elderId || '11111111-1111-4111-a111-111111111111';
+      }
+    }
 
     // Authorize access to elder's scope
     const authResult = await authorizeElderDataScope(session, elderId);
