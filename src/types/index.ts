@@ -87,3 +87,61 @@ export interface FullRiskAssessmentResponse {
   explanation: GeminiExplanation;
   status: PaymentRequestStatus;
 }
+
+// Milestone 3: PayPal Sandbox & Caregiver Approval Types
+export interface CreatePayPalOrderInput {
+  paymentRequestId: string;
+  amount: number;
+  currency?: string;
+  referenceId: string;
+  description: string;
+  returnUrl?: string;
+  cancelUrl?: string;
+}
+
+export interface PayPalOrderResult {
+  id: string; // PayPal Order ID (e.g. 3LT10656AU593714L)
+  status: string; // CREATED, SAVED, APPROVED, VOIDED, COMPLETED
+  approveUrl?: string;
+  createRequestId: string;
+  rawResponse: Record<string, unknown>;
+}
+
+export interface PayPalCaptureResult {
+  captureId: string;
+  status: string; // COMPLETED, PENDING, FAILED
+  amount: { currency_code: string; value: string };
+  rawResponse: Record<string, unknown>;
+}
+
+export interface CaregiverDecisionInput {
+  decision: 'APPROVED' | 'DECLINED';
+  reason?: string;
+}
+
+export interface PendingApprovalItem {
+  id: string; // approvalRequestId
+  paymentRequestId: string;
+  elder: {
+    id: string;
+    fullName: string;
+  };
+  amount: number;
+  currency: string;
+  recipient: {
+    merchantName: string;
+    category: string;
+    isTrusted: boolean;
+  };
+  status: string;
+  expiresAt: string;
+  riskAssessment?: {
+    id: string;
+    classification: string;
+    riskScore: number;
+    signals: RiskSignal[];
+    explanation: GeminiExplanation;
+  };
+  paypalOrderId?: string;
+  createdAt: string;
+}
