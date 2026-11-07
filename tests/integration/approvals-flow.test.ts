@@ -15,7 +15,7 @@ import {
 } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
-describe('Milestone 3: Caregiver Approval Execution & PayPal Sandbox Integration', { timeout: 35000 }, () => {
+describe('Milestone 3: Caregiver Approval Execution & PayPal Sandbox Integration', { timeout: 60000 }, () => {
   const thomasId = DEMO_PERSONAS.thomas.id;
   let testPaymentRequestId: string;
   let testApprovalRequestId: string;

@@ -107,6 +107,14 @@ export interface PayPalOrderResult {
   rawResponse: Record<string, unknown>;
 }
 
+export interface CheckoutCreateOrderResponse {
+  success: boolean;
+  orderId: string;
+  approveUrl?: string;
+  status: string;
+  reused?: boolean;
+}
+
 export interface PayPalCaptureResult {
   captureId: string;
   status: string; // COMPLETED, PENDING, FAILED
@@ -144,4 +152,49 @@ export interface PendingApprovalItem {
   };
   paypalOrderId?: string;
   createdAt: string;
+}
+
+export interface ActivityPaymentItem {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  merchantName: string;
+  category: string;
+  isTrusted: boolean;
+  requiresFamilyApproval: boolean;
+  createdAt: string;
+  settledAt?: string;
+  riskAssessment: {
+    score: number;
+    classification: string;
+    explanation: Record<string, unknown>;
+  } | null;
+  approval: {
+    id: string;
+    status: string;
+    expiresAt: string;
+    respondedAt?: string;
+    responses: unknown[];
+  } | null;
+  paypalOrderId?: string;
+}
+
+export interface ActivityAuditLogItem {
+  id: string;
+  eventType: string;
+  actorType: string;
+  actorName: string;
+  oldState?: string | null;
+  newState?: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface FamilyActivityData {
+  payments: ActivityPaymentItem[];
+  auditLogs: ActivityAuditLogItem[];
+  spendingToday: number;
+  dailyCap: number;
+  familyThreshold: number;
 }

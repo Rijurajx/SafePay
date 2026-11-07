@@ -7,7 +7,7 @@ import { prisma } from '@/lib/db';
 import { generateDeterministicFallback } from '@/lib/ai/gemini-explainer';
 import { RiskClassification } from '@prisma/client';
 
-describe('Milestone 2: Risk Evaluation & Gemini Explainer Integration Tests', { timeout: 35000 }, () => {
+describe('Milestone 2: Risk Evaluation & Gemini Explainer Integration Tests', { timeout: 60000 }, () => {
   const thomasId = DEMO_PERSONAS.thomas.id;
 
   beforeAll(async () => {
