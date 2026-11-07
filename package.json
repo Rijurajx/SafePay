@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run --fileParallelism=false",
+    "demo": "tsx scripts/test-demo.ts",
     "prisma:seed": "npx tsx prisma/seed.ts"
   },
   "prisma": {
