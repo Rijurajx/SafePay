@@ -13,7 +13,13 @@ export interface ExplanationInput {
   medianSpend?: number;
 }
 
-const SUPPORTED_MODELS = ['gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-3.8-flash'];
+// Lightweight low-latency models used during testing/development to preserve quota and speed up iteration.
+// For the final PayPal demo presentation, set GEMINI_MODEL="gemini-3.7-flash" or "gemini-3.5-flash" in .env.
+const DEFAULT_MODELS = [
+  'gemini-3.5-flash-lite', // Fastest, lowest tier model for rapid local/testing iteration
+  'gemini-3.5-flash',
+];
+
 const MODEL_TIMEOUT_MS = 3500;
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -76,7 +82,11 @@ Return a valid JSON object strictly matching this schema with NO markdown code f
 
   const ai = new GoogleGenAI({ apiKey });
 
-  for (const model of SUPPORTED_MODELS) {
+  const activeModels = process.env.GEMINI_MODEL
+    ? [process.env.GEMINI_MODEL, ...DEFAULT_MODELS.filter((m) => m !== process.env.GEMINI_MODEL)]
+    : DEFAULT_MODELS;
+
+  for (const model of activeModels) {
     try {
       const response = await withTimeout(
         ai.models.generateContent({
