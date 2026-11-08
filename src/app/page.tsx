@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
-import { CaregiverAIChatDrawer } from '@/components/caregiver/CaregiverAIChatDrawer';
 import { SessionUser } from '@/types';
 import {
   ShieldCheck,
@@ -17,16 +16,13 @@ import {
   ShoppingBag,
   Sparkles,
   RefreshCw,
-  Volume2,
-  Mic,
 } from 'lucide-react';
 
 export default function HomePage() {
-  const [user, setUser] = useState<SessionUser | null>(null);
+  const [, setUser] = useState<SessionUser | null>(null);
   const [activeTab, setActiveTab] = useState<'senior' | 'guardian'>('senior');
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'verifying' | 'completed'>('idle');
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const [recentAction, setRecentAction] = useState<string | null>(null);
 
   // Mascot eye-tracking refs
@@ -102,8 +98,6 @@ export default function HomePage() {
       console.error(e);
     }
   };
-
-  const isThomas = user?.email.includes('thomas');
 
   return (
     <div className="min-h-screen soft-mesh-bg text-[#0a0c10] font-sans selection:bg-purple-100 selection:text-purple-900 relative">
@@ -185,15 +179,6 @@ export default function HomePage() {
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
             <span>Launch Live Dashboard</span>
           </Link>
-          <button
-            onClick={() => {
-              switchPersona('maya').then(() => setIsChatOpen(true));
-            }}
-            className="liquid-pill px-5 py-3 text-slate-900 font-medium text-sm hover:bg-white active:scale-[0.98] transition-all flex items-center gap-2 shadow-2xs"
-          >
-            <Mic className="w-4 h-4 text-purple-600" />
-            <span>Talk with Caregiver AI</span>
-          </button>
         </div>
       </section>
 
@@ -410,13 +395,13 @@ export default function HomePage() {
                       <span className="h-6 px-3 bg-emerald-100 text-emerald-800 rounded-full text-[11px] font-bold flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> LIVE
                       </span>
-                      <button
-                        onClick={() => setIsChatOpen(true)}
+                      <Link
+                        href="/dashboard"
                         className="w-8 h-8 rounded-full bg-black/5 hover:bg-black/10 flex items-center justify-center transition-colors"
-                        title="AI Companion Settings"
+                        title="Family Protection Settings"
                       >
                         <Settings className="w-4 h-4 text-slate-600" />
-                      </button>
+                      </Link>
                     </div>
                   </div>
 
@@ -442,12 +427,12 @@ export default function HomePage() {
                       <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                         Recent Verification Request
                       </h3>
-                      <button
-                        onClick={() => setIsChatOpen(true)}
+                      <Link
+                        href="/dashboard"
                         className="text-xs font-semibold text-purple-600 hover:text-purple-700"
                       >
-                        Ask AI Assistant
-                      </button>
+                        View in Dashboard &rarr;
+                      </Link>
                     </div>
 
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-white/60 rounded-xl border border-black/5 gap-3">
@@ -573,24 +558,21 @@ export default function HomePage() {
               <div className="mb-6 h-10 flex items-center">
                 <span className="liquid-pill px-3 py-1 text-xs font-medium text-emerald-800 bg-emerald-50/80 flex items-center gap-1.5 border border-emerald-200">
                   <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Voice AI Active</span>
+                  <span>AI Assistant Grounded</span>
                 </span>
               </div>
-              <h3 className="text-lg font-bold text-slate-950 mb-2">Voice & Chat Companion</h3>
+              <h3 className="text-lg font-bold text-slate-950 mb-2">Caregiver AI Assistant</h3>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-6">
-                Maya & David can speak directly with the AI assistant to query transaction risks and draft respectful
-                messages to Dad.
+                Maya can consult the account-grounded AI assistant on the dashboard to review transaction risks, spending patterns, and draft respectful check-in messages.
               </p>
             </div>
-            <button
-              onClick={() => {
-                switchPersona('maya').then(() => setIsChatOpen(true));
-              }}
+            <Link
+              href="/dashboard"
               className="w-full py-2.5 rounded-full bg-slate-950 text-white text-xs font-semibold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-xs"
             >
-              <Volume2 className="w-3.5 h-3.5" />
-              <span>Talk with SafePay AI</span>
-            </button>
+              <Sparkles className="w-3.5 h-3.5 text-purple-300" />
+              <span>Open Dashboard Assistant &rarr;</span>
+            </Link>
           </div>
         </div>
       </section>
@@ -687,21 +669,6 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
-
-      {/* CAREGIVER VOICE & CHAT AI DRAWER */}
-      <CaregiverAIChatDrawer
-        currentUser={user}
-        elderName={isThomas ? 'Your Account' : 'Mr. Thomas'}
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        onOpen={() => {
-          if (!user || isThomas) {
-            switchPersona('maya').then(() => setIsChatOpen(true));
-          } else {
-            setIsChatOpen(true);
-          }
-        }}
-      />
     </div>
   );
 }
