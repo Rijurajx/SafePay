@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ShieldCheck,
@@ -28,7 +28,6 @@ interface InvitationDetails {
 }
 
 function InvitationAcceptContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
@@ -100,7 +99,7 @@ function InvitationAcceptContent() {
         setError(data.error || 'Failed to accept invitation');
       } else {
         // Redirect senior directly to their simplified companion experience
-        router.push('/elder');
+        window.location.href = '/dashboard';
       }
     } catch {
       setError('Network error accepting invitation');
