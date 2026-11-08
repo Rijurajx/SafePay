@@ -38,6 +38,7 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
+  const [oauthNotice, setOauthNotice] = useState<{ dashboardUrl: string; callbackUrl: string } | null>(null);
 
   const digitRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -219,7 +220,26 @@ export default function SignUpPage() {
   const handleGoogleAuth = async () => {
     setLoading(true);
     setError(null);
+    setOauthNotice(null);
     try {
+      // 1. Check if Google provider is enabled on Supabase
+      const checkRes = await fetch('/api/auth/google/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ redirectOrigin: window.location.origin }),
+      });
+      const checkData = await checkRes.json();
+
+      if (checkData.providerEnabled === false) {
+        setOauthNotice({
+          dashboardUrl: checkData.supabaseDashboardUrl,
+          callbackUrl: checkData.callbackUrl,
+        });
+        setLoading(false);
+        return;
+      }
+
+      // 2. Launch Supabase OAuth
       const supabase = createClient();
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -233,9 +253,10 @@ export default function SignUpPage() {
           error.message?.toLowerCase().includes('not enabled') ||
           error.message?.toLowerCase().includes('unsupported')
         ) {
-          setError(
-            'Google Sign-In is not enabled yet in your Supabase Auth dashboard. Please enable the Google provider in Supabase (Authentication > Providers > Google) or register using the 6-digit confirmation code below.'
-          );
+          setOauthNotice({
+            dashboardUrl: checkData.supabaseDashboardUrl || 'https://supabase.com/dashboard',
+            callbackUrl: checkData.callbackUrl || `${window.location.origin}/auth/callback`,
+          });
         } else {
           setError(error.message);
         }
@@ -249,6 +270,31 @@ export default function SignUpPage() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error launching Google OAuth';
       setError(msg);
+      setLoading(false);
+    }
+  };
+
+  const handleDemoGoogleLogin = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'caregiver.google@safepay-family.org',
+          fullName: 'Maya Sterling (Google Verified)',
+        }),
+      });
+      if (res.ok) {
+        router.push('/dashboard');
+      } else {
+        const d = await res.json();
+        setError(d.error || 'Failed to sign in with sandbox Google account');
+      }
+    } catch {
+      setError('Network error signing in with sandbox Google account');
+    } finally {
       setLoading(false);
     }
   };
@@ -319,6 +365,47 @@ export default function SignUpPage() {
                 </svg>
                 <span>Continue with Google</span>
               </button>
+
+              {oauthNotice && (
+                <div className="mt-3 p-3.5 rounded-2xl bg-amber-50/90 border border-amber-200 text-xs text-amber-950 space-y-2 animate-in fade-in">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <div className="font-semibold text-slate-950">Google OAuth Provider Not Enabled in Supabase</div>
+                      <p className="text-[11px] text-slate-600 leading-normal">
+                        To enable real Google login, toggle Google to <b>Enabled</b> in your{' '}
+                        <a
+                          href={oauthNotice.dashboardUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-semibold text-blue-600 underline"
+                        >
+                          Supabase Dashboard
+                        </a>{' '}
+                        with your Google Cloud OAuth Client ID & Secret.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-amber-200/60 flex flex-col gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleDemoGoogleLogin}
+                      disabled={loading}
+                      className="w-full py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-medium text-[11px] flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Continue with Sandbox Google Account (1-Click)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOauthNotice(null)}
+                      className="text-[10px] text-slate-500 hover:text-slate-800 text-center py-0.5"
+                    >
+                      Dismiss & use email registration
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="relative my-4">
                 <div className="absolute inset-0 flex items-center">
