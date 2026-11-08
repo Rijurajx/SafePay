@@ -21,6 +21,8 @@ import {
   AlertTriangle,
   X,
   Store,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { SessionUser, DemoPersonaKey } from '@/types';
 import { DashboardAIChatSection } from '@/components/dashboard/DashboardAIChatSection';
@@ -104,13 +106,17 @@ export default function DashboardPage() {
   // Elder Connect form
   const [connectName, setConnectName] = useState('');
   const [connectEmail, setConnectEmail] = useState('');
-  const [connectPassword, setConnectPassword] = useState('SafePayElder123!');
   const [connectRelationship, setConnectRelationship] = useState('Father');
   const [connectThreshold, setConnectThreshold] = useState('100');
   const [connectDailyCap, setConnectDailyCap] = useState('1000');
   const [connectSubmitting, setConnectSubmitting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
-  const [connectSuccess, setConnectSuccess] = useState<string | null>(null);
+  const [createdInvite, setCreatedInvite] = useState<{
+    elderName: string;
+    contact: string;
+    inviteLink: string;
+  } | null>(null);
+  const [copiedInvite, setCopiedInvite] = useState(false);
 
   // Senior state
   const [seniorTodaySpend, setSeniorTodaySpend] = useState<number>(0);
@@ -242,40 +248,35 @@ export default function DashboardPage() {
     e.preventDefault();
     setConnectSubmitting(true);
     setConnectError(null);
-    setConnectSuccess(null);
+    setCreatedInvite(null);
 
     try {
-      const res = await fetch('/api/family/connect-elder', {
+      const res = await fetch('/api/family/invite-elder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          elderEmail: connectEmail,
           elderFullName: connectName,
-          elderPassword: connectPassword,
+          elderEmailOrPhone: connectEmail,
           relationship: connectRelationship,
           approvalThreshold: parseFloat(connectThreshold) || 100,
           dailyCap: parseFloat(connectDailyCap) || 1000,
-          canApprove: true,
-          canManage: true,
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        setConnectError(data.error || 'Failed to connect elder');
+        setConnectError(data.error || 'Failed to issue invitation');
       } else {
-        setConnectSuccess(`Successfully connected ${connectName}! Credentials saved. SafePay protections active.`);
-        setTimeout(() => {
-          setIsConnectModalOpen(false);
-          setConnectName('');
-          setConnectEmail('');
-          setConnectSuccess(null);
-          fetchSummary();
-        }, 1500);
+        setCreatedInvite({
+          elderName: connectName,
+          contact: connectEmail,
+          inviteLink: data.inviteLink,
+        });
+        fetchSummary();
       }
     } catch {
-      setConnectError('Network error connecting elder account.');
+      setConnectError('Network error issuing invitation.');
     } finally {
       setConnectSubmitting(false);
     }
@@ -393,15 +394,25 @@ export default function DashboardPage() {
                     Protecting: {activeElder?.fullName || 'Senior Member'}
                   </h1>
                   {activeElder && (
-                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5" /> Shield Active
-                    </span>
+                    activeElder.permission?.canView ? (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                        <ShieldCheck className="w-3.5 h-3.5" /> Shield Active
+                      </span>
+                    ) : (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" /> Awaiting Senior Consent
+                      </span>
+                    )
                   )}
                 </div>
                 <p className="text-sm text-slate-600">
                   {currentUser?.email.includes('sarah') ? (
                     <span className="inline-flex items-center gap-1 text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded-md">
                       <Eye className="w-3.5 h-3.5" /> View-Only Access — Sarah can inspect transactions but cannot approve.
+                    </span>
+                  ) : !activeElder?.permission?.canView ? (
+                    <span className="inline-flex items-center gap-1 text-amber-800 font-semibold bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-200/60">
+                      <Clock className="w-3.5 h-3.5" /> Monitoring Paused: {activeElder?.fullName} must accept your family invitation before oversight activates.
                     </span>
                   ) : (
                     `Relationship: ${activeElder?.relationship || 'Family'} • Authorized to approve held transactions.`
@@ -918,141 +929,206 @@ export default function DashboardPage() {
         )}
       </main>
 
-      {/* CONNECT ELDER MODAL */}
+      {/* CONNECT / INVITE ELDER MODAL */}
       {isConnectModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
           <div className="liquid-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-white shadow-2xl relative space-y-6">
             <button
-              onClick={() => setIsConnectModalOpen(false)}
+              onClick={() => {
+                setIsConnectModalOpen(false);
+                setCreatedInvite(null);
+                setConnectError(null);
+              }}
               className="absolute top-5 right-5 p-2 rounded-full hover:bg-black/5 text-slate-500"
             >
               <X className="w-4 h-4" />
             </button>
 
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center">
-                  <UserPlus className="w-4 h-4" />
+            {createdInvite ? (
+              /* Success: Invitation Link Ready for Sharing */
+              <div className="space-y-5 animate-in fade-in">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto shadow-xs">
+                  <CheckCircle2 className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-950">Connect an Elderly Family Member</h3>
-              </div>
-              <p className="text-xs text-slate-600">
-                Set up protection for your parent or relative. SafePay will safeguard their online PayPal purchases.
-              </p>
-            </div>
+                <div className="text-center space-y-1">
+                  <h3 className="text-lg font-bold text-slate-950">Invitation Issued for {createdInvite.elderName}</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    SafePay requires <strong className="text-slate-900">{createdInvite.elderName}</strong> to accept your family invitation before financial oversight can begin.
+                  </p>
+                </div>
 
-            {connectError && (
-              <div className="p-3 bg-rose-50 text-rose-800 border border-rose-200 rounded-xl text-xs font-medium">
-                {connectError}
+                <div className="p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-2xl text-xs text-amber-900 space-y-1.5">
+                  <div className="font-bold flex items-center gap-1.5 text-[11px] text-amber-800">
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Senior Consent Gate Active</span>
+                  </div>
+                  <p className="text-[11px] text-slate-700 leading-relaxed">
+                    Until {createdInvite.elderName} opens this link and accepts, transactions will not be monitored.
+                  </p>
+                </div>
+
+                {/* Invitation Link Box */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold text-slate-700">Invitation Link:</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={createdInvite.inviteLink}
+                      className="flex-1 px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-mono outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(createdInvite.inviteLink);
+                        setCopiedInvite(true);
+                        setTimeout(() => setCopiedInvite(false), 2000);
+                      }}
+                      className="px-4 py-2.5 rounded-xl bg-slate-950 text-white text-xs font-bold hover:bg-slate-800 flex items-center gap-1.5 shrink-0 transition-colors shadow-2xs"
+                    >
+                      {copiedInvite ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
+                  <a
+                    href={createdInvite.inviteLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full sm:flex-1 py-3 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <span>Open Senior Consent Screen (Test) &rarr;</span>
+                  </a>
+                  <button
+                    onClick={() => {
+                      setIsConnectModalOpen(false);
+                      setCreatedInvite(null);
+                      setConnectName('');
+                      setConnectEmail('');
+                    }}
+                    className="w-full sm:w-auto px-5 py-3 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
               </div>
+            ) : (
+              /* Invitation Form */
+              <>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center">
+                      <UserPlus className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-950">Invite an Elderly Family Member</h3>
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    SafePay protects your loved ones with their consent. Enter their details below to send an invitation.
+                  </p>
+                </div>
+
+                {connectError && (
+                  <div className="p-3 bg-rose-50 text-rose-800 border border-rose-200 rounded-xl text-xs font-medium">
+                    {connectError}
+                  </div>
+                )}
+
+                <form onSubmit={handleConnectElder} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Senior Full Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Thomas Sterling"
+                      value={connectName}
+                      onChange={(e) => setConnectName(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/80 border border-slate-200 text-xs focus:ring-2 focus:ring-purple-600 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Email or Phone Number</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. thomas@family.org"
+                      value={connectEmail}
+                      onChange={(e) => setConnectEmail(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/80 border border-slate-200 text-xs focus:ring-2 focus:ring-purple-600 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Relationship</label>
+                    <select
+                      value={connectRelationship}
+                      onChange={(e) => setConnectRelationship(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/80 border border-slate-200 text-xs focus:ring-2 focus:ring-purple-600 outline-none"
+                    >
+                      <option value="Father">Father</option>
+                      <option value="Mother">Mother</option>
+                      <option value="Grandfather">Grandfather</option>
+                      <option value="Grandmother">Grandmother</option>
+                      <option value="Spouse">Spouse</option>
+                      <option value="Relative">Relative</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Family Approval Threshold ($)
+                      </label>
+                      <input
+                        type="number"
+                        value={connectThreshold}
+                        onChange={(e) => setConnectThreshold(e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/80 border border-slate-200 text-xs focus:ring-2 focus:ring-purple-600 outline-none"
+                      />
+                      <span className="text-[10px] text-slate-500">Hold charges above this amount</span>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Daily Maximum Cap ($)
+                      </label>
+                      <input
+                        type="number"
+                        value={connectDailyCap}
+                        onChange={(e) => setConnectDailyCap(e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/80 border border-slate-200 text-xs focus:ring-2 focus:ring-purple-600 outline-none"
+                      />
+                      <span className="text-[10px] text-slate-500">Hard stop across 24 hours</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={connectSubmitting}
+                      className="w-full py-3 rounded-full bg-slate-950 text-white text-xs font-bold hover:bg-slate-800 active:scale-95 transition-all shadow-md flex items-center justify-center gap-2"
+                    >
+                      {connectSubmitting ? (
+                        <RefreshCw className="w-4 h-4 animate-spin text-purple-400" />
+                      ) : (
+                        <UserPlus className="w-4 h-4 text-emerald-400" />
+                      )}
+                      <span>Issue Invitation & Generate Link</span>
+                    </button>
+                  </div>
+                </form>
+              </>
             )}
-
-            {connectSuccess && (
-              <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-medium flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>{connectSuccess}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleConnectElder} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Thomas Henderson"
-                  value={connectName}
-                  onChange={(e) => setConnectName(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/80 border border-slate-200 text-xs focus:ring-2 focus:ring-purple-600 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
-                <input
-                  type="email"
-                  required
-                  placeholder="e.g. thomas@safepay.demo"
-                  value={connectEmail}
-                  onChange={(e) => setConnectEmail(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/80 border border-slate-200 text-xs focus:ring-2 focus:ring-purple-600 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Senior Account Password
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. SafePayElder123!"
-                  value={connectPassword}
-                  onChange={(e) => setConnectPassword(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/80 border border-slate-200 text-xs focus:ring-2 focus:ring-purple-600 outline-none font-mono"
-                />
-                <span className="text-[10px] text-slate-500">
-                  Password the senior can use to log into their account
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Relationship</label>
-                <select
-                  value={connectRelationship}
-                  onChange={(e) => setConnectRelationship(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/80 border border-slate-200 text-xs focus:ring-2 focus:ring-purple-600 outline-none"
-                >
-                  <option value="Father">Father</option>
-                  <option value="Mother">Mother</option>
-                  <option value="Grandfather">Grandfather</option>
-                  <option value="Grandmother">Grandmother</option>
-                  <option value="Relative">Relative</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Family Approval Threshold ($)
-                  </label>
-                  <input
-                    type="number"
-                    value={connectThreshold}
-                    onChange={(e) => setConnectThreshold(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl bg-white/80 border border-slate-200 text-xs focus:ring-2 focus:ring-purple-600 outline-none"
-                  />
-                  <span className="text-[10px] text-slate-500">Hold charges above this amount</span>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Daily Maximum Cap ($)
-                  </label>
-                  <input
-                    type="number"
-                    value={connectDailyCap}
-                    onChange={(e) => setConnectDailyCap(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl bg-white/80 border border-slate-200 text-xs focus:ring-2 focus:ring-purple-600 outline-none"
-                  />
-                  <span className="text-[10px] text-slate-500">Hard stop across 24 hours</span>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={connectSubmitting}
-                  className="w-full py-3 rounded-full bg-slate-950 text-white text-xs font-bold hover:bg-slate-800 active:scale-95 transition-all shadow-md flex items-center justify-center gap-2"
-                >
-                  {connectSubmitting ? (
-                    <RefreshCw className="w-4 h-4 animate-spin text-purple-400" />
-                  ) : (
-                    <UserPlus className="w-4 h-4 text-emerald-400" />
-                  )}
-                  <span>Connect & Activate Safeguards</span>
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
