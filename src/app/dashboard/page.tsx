@@ -22,6 +22,8 @@ import {
   Store,
   Copy,
   Check,
+  Sliders,
+  Edit2,
 } from 'lucide-react';
 import { SessionUser, DemoPersonaKey } from '@/types';
 import { DashboardAIChatSection } from '@/components/dashboard/DashboardAIChatSection';
@@ -40,6 +42,9 @@ interface LinkedElder {
   protectionSettings: {
     familyApprovalThreshold: number;
     absoluteDailyCap: number;
+    absoluteTransactionCap?: number;
+    requireFamilyForNewRecipient?: boolean;
+    requireFamilyForUnusual?: boolean;
   };
   todaySpend: number;
 }
@@ -124,6 +129,22 @@ export default function DashboardPage() {
   const [seniorGuardians, setSeniorGuardians] = useState<SeniorGuardian[]>([]);
   const [seniorHolds, setSeniorHolds] = useState<SeniorHold[]>([]);
   const [seniorRecentPayments, setSeniorRecentPayments] = useState<RecentPayment[]>([]);
+
+  // Profile edit modal state
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  // Safety limits edit modal state
+  const [isLimitsModalOpen, setIsLimitsModalOpen] = useState(false);
+  const [limitThreshold, setLimitThreshold] = useState('100');
+  const [limitDailyCap, setLimitDailyCap] = useState('1000');
+  const [limitTransactionCap, setLimitTransactionCap] = useState('500');
+  const [limitNewMerchant, setLimitNewMerchant] = useState(true);
+  const [limitUnusual, setLimitUnusual] = useState(true);
+  const [limitsSaving, setLimitsSaving] = useState(false);
+  const [limitsError, setLimitsError] = useState<string | null>(null);
 
   // Action states
   const [decidingId, setDecidingId] = useState<string | null>(null);
@@ -261,6 +282,84 @@ export default function DashboardPage() {
       }
     } catch {
       setActionNotice({ message: 'Error switching family view', type: 'error' });
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileName.trim()) return;
+    setProfileSaving(true);
+    setProfileError(null);
+    try {
+      const res = await fetch('/api/auth/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fullName: profileName.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setProfileError(data.error || 'Failed to update profile');
+      } else {
+        if (currentUser) {
+          setCurrentUser({ ...currentUser, fullName: data.user.fullName });
+        }
+        setActionNotice({
+          message: 'Caregiver profile username updated successfully!',
+          type: 'success',
+        });
+        setIsProfileModalOpen(false);
+      }
+    } catch {
+      setProfileError('Network error updating profile');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const openLimitsModal = () => {
+    if (!activeElder) return;
+    setLimitThreshold(String(activeElder.protectionSettings.familyApprovalThreshold || 100));
+    setLimitDailyCap(String(activeElder.protectionSettings.absoluteDailyCap || 1000));
+    setLimitTransactionCap(String(activeElder.protectionSettings.absoluteTransactionCap || 500));
+    setLimitNewMerchant(activeElder.protectionSettings.requireFamilyForNewRecipient ?? true);
+    setLimitUnusual(activeElder.protectionSettings.requireFamilyForUnusual ?? true);
+    setLimitsError(null);
+    setIsLimitsModalOpen(true);
+  };
+
+  const handleSaveLimits = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeElder) return;
+    setLimitsSaving(true);
+    setLimitsError(null);
+    try {
+      const res = await fetch('/api/family/protection-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          elderId: activeElder.id,
+          familyApprovalThreshold: Number(limitThreshold) || 100,
+          absoluteDailyCap: Number(limitDailyCap) || 1000,
+          absoluteTransactionCap: Number(limitTransactionCap) || 500,
+          requireFamilyForNewRecipient: limitNewMerchant,
+          requireFamilyForUnusual: limitUnusual,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLimitsError(data.error || 'Failed to save limits');
+      } else {
+        setActionNotice({
+          message: `Safety limits updated for ${activeElder.fullName}!`,
+          type: 'success',
+        });
+        setIsLimitsModalOpen(false);
+        await fetchSummary();
+      }
+    } catch {
+      setLimitsError('Network error saving limits');
+    } finally {
+      setLimitsSaving(false);
     }
   };
 
@@ -440,11 +539,22 @@ export default function DashboardPage() {
             ) : (
               <div className="liquid-glass rounded-3xl p-6 sm:p-7 border border-white/80 shadow-[0_16px_40px_-12px_rgba(15,23,42,0.08)] flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-purple-700 bg-purple-100/70 px-2.5 py-0.5 rounded-full">
                       Family Guardian Circle
                     </span>
                     <span className="text-xs text-slate-500 font-medium">Logged in as {currentUser?.fullName}</span>
+                    <button
+                      onClick={() => {
+                        setProfileName(currentUser?.fullName || '');
+                        setIsProfileModalOpen(true);
+                      }}
+                      className="text-[11px] font-semibold text-purple-700 hover:text-purple-900 inline-flex items-center gap-1 bg-purple-50 hover:bg-purple-100/80 px-2.5 py-0.5 rounded-full transition-colors border border-purple-200/50"
+                      title="Edit your caregiver profile and display username"
+                    >
+                      <Edit2 className="w-3 h-3 text-purple-600" />
+                      <span>Edit Profile</span>
+                    </button>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
                     <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-950">
@@ -481,6 +591,14 @@ export default function DashboardPage() {
                 <div className="flex flex-wrap items-center gap-3">
                   {activeElder && (
                     <>
+                      <button
+                        onClick={openLimitsModal}
+                        className="liquid-pill px-3.5 py-2 text-xs font-semibold text-purple-900 bg-purple-50/80 hover:bg-purple-100 border border-purple-200 flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all"
+                        title="Adjust auto-approval threshold, daily cap, and fraud rules for this senior"
+                      >
+                        <Sliders className="w-4 h-4 text-purple-600" />
+                        <span>Adjust Limits &amp; Guardrails</span>
+                      </button>
                       <Link
                         href={`/checkout?elderId=${activeElder.id}`}
                         className="liquid-pill px-3.5 py-2 text-xs font-semibold text-slate-900 flex items-center gap-1.5 shadow-2xs hover:bg-white active:scale-95 transition-all"
@@ -524,7 +642,19 @@ export default function DashboardPage() {
               <div className="liquid-glass rounded-2xl p-5 border border-white/80 shadow-sm flex flex-col justify-between">
                 <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
                   <span>Today&apos;s Spending</span>
-                  <CreditCard className="w-4 h-4 text-slate-400" />
+                  <div className="flex items-center gap-1.5">
+                    {activeElder && (
+                      <button
+                        onClick={openLimitsModal}
+                        className="text-[10px] text-purple-700 hover:text-purple-900 font-bold bg-purple-50 hover:bg-purple-100/80 px-2 py-0.5 rounded flex items-center gap-1 transition-colors"
+                        title="Adjust daily limit"
+                      >
+                        <Sliders className="w-2.5 h-2.5 text-purple-600" />
+                        <span>Adjust</span>
+                      </button>
+                    )}
+                    <CreditCard className="w-4 h-4 text-slate-400" />
+                  </div>
                 </div>
                 <div className="mt-4">
                   <div className="text-3xl font-bold tracking-tight text-slate-950">
@@ -553,7 +683,19 @@ export default function DashboardPage() {
               <div className="liquid-glass rounded-2xl p-5 border border-white/80 shadow-sm flex flex-col justify-between">
                 <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
                   <span>Auto-Approval Threshold</span>
-                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                  <div className="flex items-center gap-1.5">
+                    {activeElder && (
+                      <button
+                        onClick={openLimitsModal}
+                        className="text-[10px] text-purple-700 hover:text-purple-900 font-bold bg-purple-50 hover:bg-purple-100/80 px-2 py-0.5 rounded flex items-center gap-1 transition-colors"
+                        title="Adjust auto-approval threshold"
+                      >
+                        <Sliders className="w-2.5 h-2.5 text-purple-600" />
+                        <span>Adjust</span>
+                      </button>
+                    )}
+                    <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                  </div>
                 </div>
                 <div className="mt-4">
                   <div className="text-3xl font-bold tracking-tight text-slate-950">
@@ -1205,6 +1347,250 @@ export default function DashboardPage() {
                 </form>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* CAREGIVER PROFILE EDIT MODAL */}
+      {isProfileModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="liquid-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-white shadow-2xl relative space-y-5">
+            <button
+              onClick={() => setIsProfileModalOpen(false)}
+              className="absolute top-5 right-5 p-2 rounded-full hover:bg-black/5 text-slate-500"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center">
+                  <Edit2 className="w-4 h-4" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-950">Edit Caregiver Profile</h3>
+              </div>
+              <p className="text-xs text-slate-600">
+                Update your display name and username visible to your family members.
+              </p>
+            </div>
+
+            {profileError && (
+              <div className="p-3 bg-rose-50 text-rose-800 border border-rose-200 rounded-xl text-xs font-medium">
+                {profileError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Your Full Name / Display Username:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  placeholder="e.g. Rijuraj Datta or Alex"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Registered Email Address:
+                </label>
+                <div className="px-3.5 py-2.5 rounded-xl bg-slate-100/80 border border-slate-200/60 text-slate-600 text-xs font-mono">
+                  {currentUser?.email}
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Primary security identifier for this Caregiver account.
+                </p>
+              </div>
+
+              <div className="pt-2 flex items-center gap-2.5">
+                <button
+                  type="submit"
+                  disabled={profileSaving || !profileName.trim()}
+                  className="flex-1 py-2.5 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {profileSaving ? (
+                    <RefreshCw className="w-4 h-4 animate-spin text-purple-400" />
+                  ) : (
+                    <Check className="w-4 h-4 text-emerald-400" />
+                  )}
+                  <span>Save Profile</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsProfileModalOpen(false)}
+                  className="px-4 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SAFETY LIMITS & GUARDRAILS MODAL */}
+      {isLimitsModalOpen && activeElder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="liquid-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-white shadow-2xl relative space-y-5">
+            <button
+              onClick={() => setIsLimitsModalOpen(false)}
+              className="absolute top-5 right-5 p-2 rounded-full hover:bg-black/5 text-slate-500"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center">
+                  <Sliders className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-950">
+                    Adjust Safety Limits for {activeElder.fullName}
+                  </h3>
+                  <p className="text-xs text-slate-600">
+                    Fine-tune financial guardrails, automated hold thresholds, and fraud alerts.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {limitsError && (
+              <div className="p-3 bg-rose-50 text-rose-800 border border-rose-200 rounded-xl text-xs font-medium">
+                {limitsError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveLimits} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Family Approval Threshold ($):
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">$</span>
+                    <input
+                      type="number"
+                      required
+                      min="10"
+                      step="5"
+                      value={limitThreshold}
+                      onChange={(e) => setLimitThreshold(e.target.value)}
+                      className="w-full pl-7 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-bold focus:ring-2 focus:ring-purple-600 outline-none"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    Transactions over this hold for review
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Daily Maximum Cap ($):
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">$</span>
+                    <input
+                      type="number"
+                      required
+                      min="50"
+                      step="25"
+                      value={limitDailyCap}
+                      onChange={(e) => setLimitDailyCap(e.target.value)}
+                      className="w-full pl-7 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-bold focus:ring-2 focus:ring-purple-600 outline-none"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    Cumulative limit across 24 hours
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Absolute Single Transaction Ceiling ($):
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">$</span>
+                  <input
+                    type="number"
+                    required
+                    min="50"
+                    step="50"
+                    value={limitTransactionCap}
+                    onChange={(e) => setLimitTransactionCap(e.target.value)}
+                    className="w-full pl-7 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-bold focus:ring-2 focus:ring-purple-600 outline-none"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-500 mt-1 block">
+                  Hard block limit for any single purchase
+                </span>
+              </div>
+
+              {/* Guardrails Checkboxes */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2.5">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={limitNewMerchant}
+                    onChange={(e) => setLimitNewMerchant(e.target.checked)}
+                    className="mt-0.5 rounded text-purple-600 focus:ring-purple-500"
+                  />
+                  <div className="text-[11px] leading-tight">
+                    <span className="font-semibold text-slate-800">
+                      Require approval for first-time or unknown merchants
+                    </span>
+                    <p className="text-slate-500 text-[10px]">
+                      Stops initial checkout at newly visited shops until verified.
+                    </p>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={limitUnusual}
+                    onChange={(e) => setLimitUnusual(e.target.checked)}
+                    className="mt-0.5 rounded text-purple-600 focus:ring-purple-500"
+                  />
+                  <div className="text-[11px] leading-tight">
+                    <span className="font-semibold text-slate-800">
+                      AI Anomaly &amp; Off-Hours Fraud Protection
+                    </span>
+                    <p className="text-slate-500 text-[10px]">
+                      Flags irregular midnight spending or suspicious recipient patterns.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="pt-2 flex items-center gap-2.5">
+                <button
+                  type="submit"
+                  disabled={limitsSaving}
+                  className="flex-1 py-2.5 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {limitsSaving ? (
+                    <RefreshCw className="w-4 h-4 animate-spin text-purple-400" />
+                  ) : (
+                    <Check className="w-4 h-4 text-emerald-400" />
+                  )}
+                  <span>Save Limits &amp; Apply Guardrails</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsLimitsModalOpen(false)}
+                  className="px-4 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -163,7 +163,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 5. Issue SafePay session cookie directly on the redirect response!
+    // 5. Determine destination: If caregiver has 0 linked elders, route to onboarding for profile & limits customization
+    const linkedEldersCount = await prisma.familyLink.count({
+      where: {
+        caregiverId: dbUser.id,
+      },
+    });
+
+    const targetUrl = linkedEldersCount === 0 ? `${origin}/auth/onboarding` : `${origin}/dashboard`;
+    response.headers.set('Location', targetUrl);
+
+    // Issue SafePay session cookie directly on the redirect response!
     const token = await generateSessionToken(dbUser.id, dbUser.email);
     response.cookies.set(SESSION_COOKIE_NAME, token, {
       httpOnly: true,

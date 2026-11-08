@@ -83,8 +83,17 @@ export async function GET(req: NextRequest) {
             ? {
                 familyApprovalThreshold: Number(l.elder.protectionSettings.familyApprovalThreshold.toString()),
                 absoluteDailyCap: Number(l.elder.protectionSettings.absoluteDailyCap.toString()),
+                absoluteTransactionCap: Number(l.elder.protectionSettings.absoluteTransactionCap.toString()),
+                requireFamilyForNewRecipient: l.elder.protectionSettings.requireFamilyForNewRecipient,
+                requireFamilyForUnusual: l.elder.protectionSettings.requireFamilyForUnusual,
               }
-            : { familyApprovalThreshold: 100, absoluteDailyCap: 1000 },
+            : {
+                familyApprovalThreshold: 100,
+                absoluteDailyCap: 1000,
+                absoluteTransactionCap: 500,
+                requireFamilyForNewRecipient: true,
+                requireFamilyForUnusual: true,
+              },
           todaySpend: spendingByElder[l.elder.id] || 0,
         })),
         pendingApprovalsCount: pendingApprovals.length,
