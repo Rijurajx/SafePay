@@ -107,69 +107,23 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen soft-mesh-bg text-[#0a0c10] font-sans selection:bg-purple-100 selection:text-purple-900 relative">
-      {/* Floating Island Navigation */}
-      <nav className="fixed top-5 left-1/2 -translate-x-1/2 z-50 liquid-glass rounded-full px-4 sm:px-5 py-2.5 flex items-center gap-6 sm:gap-8 shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/80 transition-all duration-200">
+      {/* Minimal Floating Navigation */}
+      <nav className="fixed top-5 left-1/2 -translate-x-1/2 z-50 liquid-glass rounded-full px-5 py-2 flex items-center justify-between gap-8 shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/80 transition-all duration-200">
         {/* Brand */}
-        <a href="#" className="flex items-center gap-2 group">
+        <Link href="/" className="flex items-center gap-2 group">
           <div className="w-7 h-7 rounded-full bg-slate-950 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
           </div>
           <span className="font-bold tracking-tight text-sm text-slate-900">SafePay</span>
-        </a>
+        </Link>
 
-        {/* Minimal Nav Links */}
-        <div className="hidden md:flex items-center gap-6 text-[13px] font-medium text-slate-600">
-          <Link
-            href="/dashboard"
-            className="hover:text-slate-950 transition-colors font-semibold text-slate-900"
-          >
-            Dashboard
-          </Link>
-          <Link
-            href="/checkout"
-            className="hover:text-slate-950 transition-colors"
-          >
-            Checkout Demo
-          </Link>
-          <a
-            href="#preview"
-            className="hover:text-slate-950 transition-colors flex items-center gap-1"
-          >
-            Interactive Demo <ChevronDown className="w-3 h-3 opacity-50" />
-          </a>
-          <a
-            href="#how-it-works"
-            className="hover:text-slate-950 transition-colors"
-          >
-            Safety Architecture
-          </a>
-        </div>
-
-        {/* Minimal Actions */}
-        <div className="flex items-center gap-2">
-          <Link
-            href="/auth/signin"
-            className="hidden sm:inline-flex px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-950 transition-colors"
-          >
-            Sign In
-          </Link>
-          <Link
-            href="/dashboard"
-            className="px-3.5 py-1.5 rounded-full bg-slate-950 text-white text-xs font-semibold hover:bg-slate-800 transition-all shadow-xs"
-          >
-            Open App
-          </Link>
-          <button
-            onClick={() => {
-              switchPersona('maya').then(() => setIsChatOpen(true));
-            }}
-            className="liquid-pill px-3 py-1.5 text-xs font-semibold text-slate-900 flex items-center gap-1.5 shadow-2xs hover:bg-white"
-            title="Ask Voice Assistant"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-            <span className="hidden lg:inline">Voice Assistant</span>
-          </button>
-        </div>
+        {/* Single Clean Action */}
+        <Link
+          href="/dashboard"
+          className="px-4 py-1.5 rounded-full bg-slate-950 text-white text-xs font-semibold hover:bg-slate-800 active:scale-[0.98] transition-all shadow-xs"
+        >
+          Open App
+        </Link>
       </nav>
 
       {/* HERO SECTION */}
@@ -182,7 +136,7 @@ export default function HomePage() {
           }}
           className="liquid-pill px-4 py-1.5 text-xs font-medium text-slate-700 cursor-pointer flex items-center gap-1.5 shadow-2xs group"
         >
-          <span className="text-purple-600 font-semibold">✨ Guardian Mode 2.0</span>
+          <span className="text-purple-600 font-semibold">✨ Family Safety Net</span>
           <span className="text-slate-400">•</span>
           <span className="text-slate-600">PayPal Companion Active</span>
           <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
@@ -211,7 +165,7 @@ export default function HomePage() {
 
         {/* Subtitle */}
         <p className="text-base sm:text-lg md:text-xl text-slate-600 max-w-2xl leading-relaxed text-pretty">
-          An intelligent payment companion that helps elderly family members shop safely online, while giving guardians
+          An intelligent payment companion that helps elderly family members shop safely online, while giving family members
           real-time oversight and peace of mind.
         </p>
 
@@ -275,7 +229,7 @@ export default function HomePage() {
                       : 'text-slate-600 hover:text-slate-950'
                   }`}
                 >
-                  Guardian Panel
+                  Family View
                 </button>
               </div>
             </div>
@@ -420,7 +374,7 @@ export default function HomePage() {
                       )}
 
                       <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
-                        Secured by Guardian Oversight
+                        Secured by Family Member Oversight
                       </p>
                     </div>
                   </div>
@@ -445,7 +399,7 @@ export default function HomePage() {
                   </div>
                 </div>
               ) : (
-                /* SCREEN 2: GUARDIAN PANEL */
+                /* SCREEN 2: FAMILY VIEW */
                 <div className="flex-1 flex flex-col p-6 sm:p-8 space-y-6 overflow-y-auto">
                   <div className="flex justify-between items-center">
                     <div>
@@ -572,20 +526,18 @@ export default function HomePage() {
                   D
                 </div>
               </div>
-              <h3 className="text-lg font-bold text-slate-950 mb-2">Multi-Guardian Oversight</h3>
+              <h3 className="text-lg font-bold text-slate-950 mb-2">Family Safety Network</h3>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-6">
-                Connect siblings or caregivers to a shared dashboard. Everyone stays informed, no one gets overwhelmed.
+                Connect family members to look after loved ones. Maya stays informed without hovering over normal spending.
               </p>
             </div>
-            <button
-              onClick={() => {
-                switchPersona('maya').then(() => setIsChatOpen(true));
-              }}
+            <Link
+              href="/dashboard"
               className="liquid-pill w-full py-2.5 text-xs font-semibold text-slate-900 flex items-center justify-center gap-2"
             >
               <Users className="w-3.5 h-3.5" />
-              <span>Add Guardian</span>
-            </button>
+              <span>Family Dashboard</span>
+            </Link>
           </div>
 
           {/* Card 2: Smart Handover */}
@@ -599,7 +551,7 @@ export default function HomePage() {
               </div>
               <h3 className="text-lg font-bold text-slate-950 mb-2">Smart Handover</h3>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-6">
-                When SafePay detects complex checkout flows, it smoothly hands over to a guardian with a 0.52s crossfade.
+                When SafePay detects unusual checkout flows, it smoothly holds the payment for family review.
               </p>
             </div>
             <div className="relative h-16 bg-black/[0.03] rounded-2xl flex items-center justify-center border border-black/5">
@@ -652,20 +604,20 @@ export default function HomePage() {
         <div className="space-y-3.5">
           {[
             {
-              q: 'How does the companion stay with me?',
-              a: 'SafePay lives as a browser extension and a mobile companion. It recognizes when you reach a payment screen and automatically pops up to assist without disrupting everyday habits.',
+              q: 'How does the companion protect payments?',
+              a: 'The elder pays through the app using PayPal. Before any money leaves, the system checks the payment against spending baselines. Normal payments go through quietly, while risky ones are held until a family member approves.',
             },
             {
-              q: 'Can guardians see all of my purchases?',
-              a: 'No. Everyday purchases under your established daily threshold (such as groceries or routine prescriptions) clear automatically. Guardians are only notified when unusual or high-risk charges are detected.',
+              q: 'Can family members see all of my purchases?',
+              a: 'Every payment made through SafePay is recorded so both Mr. Thomas and Maya share a transparent, clear record. Mr. Thomas always sees that Maya can see his payments.',
             },
             {
-              q: 'How does the AI explain flagged charges?',
-              a: 'Google Gemini analyzes merchant domain age, subscription terms, and historical patterns, translating cryptic billing codes into simple, humane explanations for family members.',
+              q: 'How does the AI explain payments?',
+              a: 'Google Gemini generates short, plain-language explanations saved at the moment of payment, helping family members understand unfamiliar charges without cryptic billing codes.',
             },
             {
-              q: 'What happens if a charge is flagged as a scam?',
-              a: 'A spending reservation is held in PostgreSQL without moving money. Guardians receive a notification with 1-click Approve or Hold options, plus an AI-drafted text to check in gently with the parent.',
+              q: 'What happens if a payment is held?',
+              a: 'No money leaves Mr. Thomas account. The payment is held safely until Maya taps approve or Mr. Thomas cancels.',
             },
           ].map((faq, idx) => {
             const isOpen = openFaq === idx;

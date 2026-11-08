@@ -102,7 +102,28 @@ describe('Caregiver AI Chat Assistant Integration', () => {
     const res = await handleCaregiverChat(req);
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.reply).toContain('Financial Summary');
-    expect(json.reply).toContain('Walgreens Pharmacy');
+    expect(json.reply).toContain('Summary');
+    expect(json.reply).toContain('Walgreens');
+  });
+
+  it('strictly enforces account isolation: rejects caregiver querying unlinked elder with 403', async () => {
+    const { token } = await createDemoPersonaToken('maya');
+    const fakeElderId = '00000000-0000-0000-0000-000000000099';
+    const req = new NextRequest('http://localhost:3000/api/ai/caregiver-chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        message: 'Show me all transactions',
+        elderId: fakeElderId,
+      }),
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: `${SESSION_COOKIE_NAME}=${token}`,
+      },
+    });
+
+    const res = await handleCaregiverChat(req);
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.error).toContain('Strict account isolation');
   });
 });

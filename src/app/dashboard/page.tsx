@@ -23,7 +23,7 @@ import {
   Store,
 } from 'lucide-react';
 import { SessionUser, DemoPersonaKey } from '@/types';
-import { CaregiverAIChatDrawer } from '@/components/caregiver/CaregiverAIChatDrawer';
+import { DashboardAIChatSection } from '@/components/dashboard/DashboardAIChatSection';
 
 interface LinkedElder {
   id: string;
@@ -92,7 +92,6 @@ interface SeniorGuardian {
 export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
   const [role, setRole] = useState<'CAREGIVER' | 'PROTECTED_USER' | null>(null);
 
@@ -101,7 +100,6 @@ export default function DashboardPage() {
   const [selectedElderId, setSelectedElderId] = useState<string>('');
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Elder Connect form
   const [connectName, setConnectName] = useState('');
@@ -155,7 +153,6 @@ export default function DashboardPage() {
       console.error('Failed to load dashboard summary:', e);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, [router, selectedElderId]);
 
@@ -163,13 +160,7 @@ export default function DashboardPage() {
     fetchSummary();
   }, [fetchSummary]);
 
-  const handleManualRefresh = () => {
-    setRefreshing(true);
-    fetchSummary();
-  };
-
   const switchPersona = async (key: DemoPersonaKey) => {
-    setRefreshing(true);
     try {
       await fetch('/api/auth/demo-switch', {
         method: 'POST',
@@ -179,8 +170,6 @@ export default function DashboardPage() {
       await fetchSummary();
     } catch (e) {
       console.error(e);
-    } finally {
-      setRefreshing(false);
     }
   };
 
@@ -230,7 +219,6 @@ export default function DashboardPage() {
   };
 
   const handleSwitchFamily = async (targetUserId: string) => {
-    setRefreshing(true);
     setActionNotice(null);
     try {
       const res = await fetch('/api/auth/switch-family', {
@@ -247,8 +235,6 @@ export default function DashboardPage() {
       }
     } catch {
       setActionNotice({ message: 'Error switching family view', type: 'error' });
-    } finally {
-      setRefreshing(false);
     }
   };
 
@@ -311,73 +297,45 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen soft-mesh-bg text-[#0a0c10] font-sans selection:bg-purple-100 selection:text-purple-900 pb-20">
-      {/* TOP FLOATING NAVIGATION */}
+      {/* Minimal Top Navigation */}
       <header className="sticky top-4 z-40 px-4 sm:px-6 max-w-7xl mx-auto">
-        <div className="liquid-glass rounded-2xl px-4 sm:px-6 py-3 flex items-center justify-between border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
-          {/* Brand & Mode */}
-          <div className="flex items-center gap-4">
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-8 h-8 rounded-full bg-slate-950 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              </div>
-              <span className="font-bold tracking-tight text-base text-slate-950">SafePay</span>
-            </Link>
-
-            <div className="hidden md:flex items-center gap-2 pl-3 border-l border-black/10">
-              <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-white/70 text-slate-800 border border-black/5 shadow-2xs">
-                {role === 'CAREGIVER' ? 'Guardian Command Center' : 'Protected Senior Hub'}
-              </span>
+        <div className="liquid-glass rounded-full px-5 py-2.5 flex items-center justify-between border border-white/80 shadow-sm">
+          {/* Brand */}
+          <Link href="/" className="flex items-center gap-2 group">
+            <div className="w-7 h-7 rounded-full bg-slate-950 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
             </div>
-          </div>
+            <span className="font-bold tracking-tight text-sm text-slate-950">SafePay</span>
+          </Link>
 
-          {/* Quick Persona Switcher for Hackathon Testing */}
-          <div className="hidden lg:flex items-center gap-1.5 bg-black/[0.04] p-1 rounded-full border border-black/5">
-            <span className="text-[11px] font-medium text-slate-500 px-2">Simulate Persona:</span>
-            {(
-              [
-                { key: 'thomas', label: 'Thomas (Senior)', active: currentUser?.email.includes('thomas') },
-                { key: 'maya', label: 'Maya (Primary)', active: currentUser?.email.includes('maya') },
-                { key: 'david', label: 'David (Approver)', active: currentUser?.email.includes('david') },
-                { key: 'sarah', label: 'Sarah (Auditor)', active: currentUser?.email.includes('sarah') },
-              ] as const
-            ).map((p) => (
+          {/* Persona Switch & Logout */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center bg-black/[0.04] p-1 rounded-full border border-black/5">
               <button
-                key={p.key}
-                onClick={() => switchPersona(p.key)}
+                onClick={() => switchPersona('thomas')}
                 className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                  p.active
+                  currentUser?.email.includes('thomas')
                     ? 'bg-slate-950 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-950 hover:bg-white/60'
+                    : 'text-slate-600 hover:text-slate-950'
                 }`}
               >
-                {p.label}
+                Mr. Thomas
               </button>
-            ))}
-          </div>
-
-          {/* Right Action Buttons */}
-          <div className="flex items-center gap-2">
-            <Link
-              href="/checkout"
-              className="liquid-pill px-3.5 py-1.5 text-xs font-semibold text-slate-900 flex items-center gap-1.5 shadow-2xs hover:bg-white"
-            >
-              <ShoppingBag className="w-3.5 h-3.5 text-purple-600" />
-              <span className="hidden sm:inline">Try Checkout Demo</span>
-              <span className="sm:hidden">Checkout</span>
-            </Link>
-
-            <button
-              onClick={handleManualRefresh}
-              disabled={refreshing}
-              className="p-2 text-slate-600 hover:text-slate-950 hover:bg-white/60 rounded-full transition-all"
-              title="Refresh Data"
-            >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-purple-600' : ''}`} />
-            </button>
+              <button
+                onClick={() => switchPersona('maya')}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                  currentUser?.email.includes('maya')
+                    ? 'bg-slate-950 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-950'
+                }`}
+              >
+                Maya
+              </button>
+            </div>
 
             <button
               onClick={handleLogout}
-              className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50/60 rounded-full transition-all"
+              className="p-1.5 text-slate-400 hover:text-slate-900 rounded-full transition-colors"
               title="Sign Out"
             >
               <LogOut className="w-4 h-4" />
@@ -480,7 +438,9 @@ export default function DashboardPage() {
                   <span>Connect Another Elder</span>
                 </button>
                 <button
-                  onClick={() => setIsChatOpen(true)}
+                  onClick={() => {
+                    document.getElementById('ai-chat-section')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
                   className="px-4 py-2 rounded-full bg-slate-950 text-white text-xs font-semibold flex items-center gap-2 hover:bg-slate-800 active:scale-95 transition-all shadow-md shadow-slate-950/10"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-purple-400" />
@@ -713,6 +673,33 @@ export default function DashboardPage() {
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* AI PAYMENT ASSISTANT CHAT (DESIGNED LIKE HOMEPAGE HERO SECTION) */}
+            <div id="ai-chat-section" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
+                    <Sparkles className="w-3.5 h-3.5" />
+                  </div>
+                  <h2 className="text-xl font-bold tracking-tight text-slate-950">
+                    Payment Context & AI Assistant
+                  </h2>
+                  <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-purple-100 text-purple-900 border border-purple-200">
+                    Gemini 2.5 Flash
+                  </span>
+                </div>
+                <span className="text-xs text-slate-500 hidden sm:inline">
+                  Streaming live context from {activeElder?.fullName || 'Mr. Thomas'}&apos;s spending patterns
+                </span>
+              </div>
+
+              <DashboardAIChatSection
+                currentUser={currentUser}
+                elderName={activeElder?.fullName || 'Mr. Thomas'}
+                elderId={activeElder?.id}
+                pendingApprovals={pendingApprovals}
+              />
             </div>
 
             {/* GUARDIAN TEAM & FAMILY LINK PERMISSIONS */}
@@ -1069,15 +1056,6 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-
-      {/* CAREGIVER AI VOICE CHAT DRAWER */}
-      <CaregiverAIChatDrawer
-        currentUser={currentUser}
-        elderName={activeElder?.fullName || 'Mr. Thomas'}
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        onOpen={() => setIsChatOpen(true)}
-      />
     </div>
   );
 }
