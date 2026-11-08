@@ -74,9 +74,33 @@ export default function SignUpPage() {
     const trimmedName = fullName.trim();
 
     try {
-      // 1. Dispatch real verification email with confirmation code via Supabase Auth
+      // 1. Prepare server-side ticket and clean up any stale orphaned Supabase user
+      const res = await fetch('/api/auth/register-caregiver', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: trimmedName,
+          email: normalizedEmail,
+          password,
+          confirmPassword,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Registration failed');
+        setLoading(false);
+        return;
+      }
+
+      if (data.verificationTicket) {
+        setVerificationTicket(data.verificationTicket);
+      }
+
+      // 2. Dispatch real verification email with confirmation link & code via Supabase Auth
       const supabase = createClient();
-      const { error: supaError } = await supabase.auth.signUp({
+      const { data: supaData, error: supaError } = await supabase.auth.signUp({
         email: normalizedEmail,
         password: password,
         options: {
@@ -99,30 +123,20 @@ export default function SignUpPage() {
         console.warn('Supabase signUp notice:', supaError.message);
       }
 
-      // 2. Prepare stateless cryptographic registration ticket
-      const res = await fetch('/api/auth/register-caregiver', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: trimmedName,
+      // If user already existed unconfirmed in Supabase, explicitly trigger resend
+      if (supaData?.user && (!supaData.user.identities || supaData.user.identities.length === 0)) {
+        await supabase.auth.resend({
+          type: 'signup',
           email: normalizedEmail,
-          password,
-          confirmPassword,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok && !supaError) {
-        setError(data.error || 'Registration failed');
-      } else {
-        if (data.verificationTicket) {
-          setVerificationTicket(data.verificationTicket);
-        }
-        setStep('VERIFY');
-        setResendCooldown(30);
-        setSuccessNotice(`A 6-digit confirmation code was emailed to ${normalizedEmail}. Please check your inbox.`);
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
       }
+
+      setStep('VERIFY');
+      setResendCooldown(30);
+      setSuccessNotice(`A confirmation link and code have been emailed to ${normalizedEmail}.`);
     } catch {
       setError('Network error initiating registration. Please check your connection.');
     } finally {
@@ -248,6 +262,9 @@ export default function SignUpPage() {
         await supabase.auth.resend({
           type: 'signup',
           email: normalizedEmail,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+          },
         });
       } catch (err) {
         console.warn('Supabase resend notice:', err);
@@ -267,7 +284,7 @@ export default function SignUpPage() {
       }
 
       setResendCooldown(30);
-      setSuccessNotice(`A fresh 6-digit confirmation code was emailed to ${normalizedEmail}.`);
+      setSuccessNotice(`A fresh confirmation link & code has been dispatched to ${normalizedEmail}.`);
     } catch {
       setError('Network error resending code. Please try again.');
     } finally {
@@ -610,11 +627,22 @@ export default function SignUpPage() {
               </div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-950">Confirm Your Email</h1>
               <p className="text-xs text-slate-600">
-                We sent a 6-digit confirmation code to:
+                We sent a verification link &amp; confirmation code to:
               </p>
               <div className="font-bold text-xs text-slate-950 bg-white/70 py-1 px-3 rounded-full inline-block border border-black/5">
                 {email}
               </div>
+            </div>
+
+            {/* Email Link Prompt Banner */}
+            <div className="p-3.5 rounded-2xl bg-purple-50/80 border border-purple-200/80 text-purple-950 text-xs space-y-1">
+              <div className="font-semibold flex items-center gap-1.5 text-purple-900">
+                <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                <span>Instant Activation via Email Link</span>
+              </div>
+              <p className="text-[11px] text-purple-800 leading-relaxed">
+                Click the confirmation link inside the email sent to your inbox to instantly activate your caregiver account. If an OTP code was included, you can also enter it below.
+              </p>
             </div>
 
             {error && (
@@ -631,12 +659,11 @@ export default function SignUpPage() {
               </div>
             )}
 
-
             {/* 6 Segmented Digit Inputs */}
             <form onSubmit={handleVerifyCode} className="space-y-6">
               <div>
                 <label className="block text-center text-xs font-semibold text-slate-700 mb-3">
-                  Enter the 6-digit confirmation code:
+                  Or enter the 6-digit confirmation code:
                 </label>
                 <div className="flex items-center justify-center gap-2 sm:gap-2.5">
                   {otpDigits.map((digit, idx) => (
@@ -667,7 +694,7 @@ export default function SignUpPage() {
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>Verify Code & Activate Account</span>
+                    <span>Verify Code &amp; Activate Account</span>
                   </>
                 )}
               </button>
@@ -680,7 +707,9 @@ export default function SignUpPage() {
                   disabled={loading || resendCooldown > 0}
                   className="text-xs text-purple-700 hover:text-purple-900 font-semibold disabled:text-slate-400 transition-colors"
                 >
-                  {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Did not receive code? Resend'}
+                  {resendCooldown > 0
+                    ? `Resend confirmation email in ${resendCooldown}s`
+                    : 'Did not receive email? Resend verification link'}
                 </button>
               </div>
             </form>
