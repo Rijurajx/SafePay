@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ShieldCheck, ArrowRight, Lock, Mail, Sparkles } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
-export default function SignInPage() {
+function SignInContent() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,26 +39,48 @@ export default function SignInPage() {
     }
   };
 
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const err = searchParams.get('error');
+    if (err) {
+      setError(decodeURIComponent(err));
+    }
+  }, [searchParams]);
+
   const handleGoogleAuth = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: 'caregiver.google@safepay-family.org',
-          fullName: 'Caregiver Member (Google Verified)',
-        }),
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
-      if (res.ok) {
-        router.push('/dashboard');
-      } else {
-        setError('Failed to authenticate with Google');
+
+      if (error) {
+        if (
+          error.message?.toLowerCase().includes('not enabled') ||
+          error.message?.toLowerCase().includes('unsupported')
+        ) {
+          setError(
+            'Google Sign-In is not enabled yet in your Supabase Auth dashboard. Please enable the Google provider in Supabase (Authentication > Providers > Google) or sign in with your email & password.'
+          );
+        } else {
+          setError(error.message);
+        }
+        setLoading(false);
+        return;
       }
-    } catch {
-      setError('Network error connecting with Google');
-    } finally {
+
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error launching Google OAuth';
+      setError(msg);
       setLoading(false);
     }
   };
@@ -248,5 +271,19 @@ export default function SignInPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen soft-mesh-bg flex items-center justify-center p-6 text-slate-800">
+          <div className="w-8 h-8 rounded-full border-2 border-slate-900 border-t-transparent animate-spin" />
+        </div>
+      }
+    >
+      <SignInContent />
+    </Suspense>
   );
 }

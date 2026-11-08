@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase/client';
 import {
   ShieldCheck,
   ArrowRight,
@@ -214,27 +215,40 @@ export default function SignUpPage() {
     }
   };
 
-  // Google OAuth registration
+  // Google OAuth registration via Supabase Auth
   const handleGoogleAuth = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: 'caregiver.google@safepay-family.org',
-          fullName: 'Caregiver Member (Google Verified)',
-        }),
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
-      if (res.ok) {
-        router.push('/dashboard');
-      } else {
-        setError('Failed to authenticate with Google');
+
+      if (error) {
+        if (
+          error.message?.toLowerCase().includes('not enabled') ||
+          error.message?.toLowerCase().includes('unsupported')
+        ) {
+          setError(
+            'Google Sign-In is not enabled yet in your Supabase Auth dashboard. Please enable the Google provider in Supabase (Authentication > Providers > Google) or register using the 6-digit confirmation code below.'
+          );
+        } else {
+          setError(error.message);
+        }
+        setLoading(false);
+        return;
       }
-    } catch {
-      setError('Network error connecting with Google');
-    } finally {
+
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error launching Google OAuth';
+      setError(msg);
       setLoading(false);
     }
   };

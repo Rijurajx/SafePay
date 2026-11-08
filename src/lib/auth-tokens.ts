@@ -159,3 +159,4 @@ export function verifyInvitationToken(token: string): { success: boolean; error?
 
   return { success: true, payload };
 }
+
