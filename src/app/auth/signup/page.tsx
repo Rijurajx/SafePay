@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -19,8 +18,6 @@ import {
 } from 'lucide-react';
 
 export default function SignUpPage() {
-  const router = useRouter();
-
   // Step 1: Caregiver Details State
   const [step, setStep] = useState<'DETAILS' | 'VERIFY'>('DETAILS');
   const [fullName, setFullName] = useState('');
@@ -30,7 +27,6 @@ export default function SignUpPage() {
 
   // Step 2: Verification State
   const [verificationTicket, setVerificationTicket] = useState<string | null>(null);
-  const [demoCode, setDemoCode] = useState<string | null>(null);
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [resendCooldown, setResendCooldown] = useState<number>(0);
 
@@ -65,7 +61,7 @@ export default function SignUpPage() {
     }
   }, [resendCooldown]);
 
-  // Step 1: Submit Details & Request OTP Code
+  // Step 1: Submit Details & Request OTP Code via Real Email Delivery
   const handleInitiateSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid) return;
@@ -74,13 +70,42 @@ export default function SignUpPage() {
     setError(null);
     setSuccessNotice(null);
 
+    const normalizedEmail = email.trim().toLowerCase();
+    const trimmedName = fullName.trim();
+
     try {
+      // 1. Dispatch real verification email with confirmation code via Supabase Auth
+      const supabase = createClient();
+      const { error: supaError } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password: password,
+        options: {
+          data: {
+            full_name: trimmedName,
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (supaError) {
+        if (
+          supaError.message?.toLowerCase().includes('already registered') ||
+          supaError.message?.toLowerCase().includes('already exists')
+        ) {
+          setError('An account with this email address already exists. Please sign in instead.');
+          setLoading(false);
+          return;
+        }
+        console.warn('Supabase signUp notice:', supaError.message);
+      }
+
+      // 2. Prepare stateless cryptographic registration ticket
       const res = await fetch('/api/auth/register-caregiver', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fullName,
-          email,
+          fullName: trimmedName,
+          email: normalizedEmail,
           password,
           confirmPassword,
         }),
@@ -88,17 +113,18 @@ export default function SignUpPage() {
 
       const data = await res.json();
 
-      if (!res.ok) {
+      if (!res.ok && !supaError) {
         setError(data.error || 'Registration failed');
       } else {
-        setVerificationTicket(data.verificationTicket);
-        setDemoCode(data.demoCode || null);
+        if (data.verificationTicket) {
+          setVerificationTicket(data.verificationTicket);
+        }
         setStep('VERIFY');
         setResendCooldown(30);
-        setSuccessNotice(`Confirmation code sent to ${data.email}`);
+        setSuccessNotice(`A 6-digit confirmation code was emailed to ${normalizedEmail}. Please check your inbox.`);
       }
     } catch {
-      setError('Network error initiating registration. Please try again.');
+      setError('Network error initiating registration. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -142,75 +168,108 @@ export default function SignUpPage() {
     }
   };
 
-  // Step 2: Confirm 6-Digit Code
+  // Step 2: Confirm 6-Digit Code from User's Real Email Inbox
   const handleVerifyCode = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const code = otpDigits.join('');
-    if (code.length !== 6 || !verificationTicket) {
+    if (code.length !== 6) {
       setError('Please enter all 6 digits of the confirmation code');
       return;
     }
 
     setLoading(true);
     setError(null);
+    const normalizedEmail = email.trim().toLowerCase();
 
     try {
+      let supaUserId: string | undefined;
+
+      // 1. Verify code via Supabase Auth
+      try {
+        const supabase = createClient();
+        const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+          email: normalizedEmail,
+          token: code,
+          type: 'signup',
+        });
+
+        if (!verifyError && verifyData?.user?.id) {
+          supaUserId = verifyData.user.id;
+        } else if (verifyError) {
+          console.warn('Supabase verifyOtp notice:', verifyError.message);
+        }
+      } catch (supaErr) {
+        console.warn('Supabase client error:', supaErr);
+      }
+
+      // 2. Persist to PostgreSQL database and generate authenticated session cookie
       const res = await fetch('/api/auth/verify-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           verificationTicket,
           code,
+          email: normalizedEmail,
+          fullName: fullName.trim(),
+          password,
+          supabaseId: supaUserId,
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || 'Verification failed');
+        setError(data.error || 'Verification failed. Please check the 6-digit code in your email.');
         if (data.nextTicket) {
           setVerificationTicket(data.nextTicket);
         }
       } else {
-        router.push('/dashboard');
+        window.location.href = '/dashboard';
       }
     } catch {
-      setError('Network error verifying code. Please try again.');
+      setError('Network error verifying code. Please check your connection.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Quick fill for sandbox demo
-  const handleUseDemoCode = () => {
-    if (demoCode && demoCode.length === 6) {
-      setOtpDigits(demoCode.split(''));
-    }
-  };
-
-  // Resend code
+  // Resend code via real email delivery
   const handleResend = async () => {
-    if (resendCooldown > 0 || !verificationTicket) return;
+    if (resendCooldown > 0) return;
 
     setLoading(true);
     setError(null);
+    const normalizedEmail = email.trim().toLowerCase();
+
     try {
-      const res = await fetch('/api/auth/resend-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ verificationTicket }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setVerificationTicket(data.verificationTicket);
-        setDemoCode(data.demoCode || null);
-        setResendCooldown(30);
-        setSuccessNotice('A new code has been sent.');
-      } else {
-        setError(data.error || 'Failed to resend code');
+      // 1. Resend real email via Supabase
+      try {
+        const supabase = createClient();
+        await supabase.auth.resend({
+          type: 'signup',
+          email: normalizedEmail,
+        });
+      } catch (err) {
+        console.warn('Supabase resend notice:', err);
       }
+
+      // 2. Refresh server-side ticket
+      if (verificationTicket) {
+        const res = await fetch('/api/auth/resend-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ verificationTicket }),
+        });
+        const data = await res.json();
+        if (data.verificationTicket) {
+          setVerificationTicket(data.verificationTicket);
+        }
+      }
+
+      setResendCooldown(30);
+      setSuccessNotice(`A fresh 6-digit confirmation code was emailed to ${normalizedEmail}.`);
     } catch {
-      setError('Network error resending code');
+      setError('Network error resending code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -239,12 +298,18 @@ export default function SignUpPage() {
         return;
       }
 
-      // 2. Launch Supabase OAuth
+      // 2. Clear any stale client session & launch Supabase OAuth
       const supabase = createClient();
+      await supabase.auth.signOut().catch(() => {});
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            prompt: 'select_account',
+            access_type: 'offline',
+          },
         },
       });
 
@@ -287,7 +352,7 @@ export default function SignUpPage() {
         }),
       });
       if (res.ok) {
-        router.push('/dashboard');
+        window.location.href = '/dashboard';
       } else {
         const d = await res.json();
         setError(d.error || 'Failed to sign in with sandbox Google account');
@@ -566,26 +631,6 @@ export default function SignUpPage() {
               </div>
             )}
 
-            {/* Demo Helper Banner for Testing */}
-            {demoCode && (
-              <div className="p-3 rounded-2xl bg-amber-50/80 border border-amber-200 text-amber-900 text-xs space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold flex items-center gap-1 text-[11px]">
-                    <Sparkles className="w-3 h-3 text-amber-600" />
-                    Sandbox Demo Code:
-                  </span>
-                  <button
-                    onClick={handleUseDemoCode}
-                    className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-200/80 hover:bg-amber-300 transition-colors"
-                  >
-                    Auto-Fill
-                  </button>
-                </div>
-                <div className="font-mono font-extrabold text-base tracking-widest text-slate-900">
-                  {demoCode}
-                </div>
-              </div>
-            )}
 
             {/* 6 Segmented Digit Inputs */}
             <form onSubmit={handleVerifyCode} className="space-y-6">

@@ -29,7 +29,6 @@ export async function POST(req: NextRequest) {
       success: true,
       message: `A fresh 6-digit verification code has been dispatched to ${payload.email}`,
       verificationTicket: newTicket,
-      demoCode: newCode,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal error resending verification code';

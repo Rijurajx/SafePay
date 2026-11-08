@@ -100,6 +100,12 @@ export async function GET(req: NextRequest) {
           riskScore: a.paymentRequest.currentRiskAssessment?.riskScore || 75,
           explanation: a.paymentRequest.currentRiskAssessment?.explanationContext,
         })),
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
       });
     } else {
       // Current user is a PROTECTED_USER (Senior)
@@ -177,6 +183,12 @@ export async function GET(req: NextRequest) {
           category: p.recipient.category,
           createdAt: p.createdAt.toISOString(),
         })),
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
       });
     }
   } catch (error: unknown) {

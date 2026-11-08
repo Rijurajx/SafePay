@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ShieldCheck,
@@ -26,6 +25,7 @@ import {
 } from 'lucide-react';
 import { SessionUser, DemoPersonaKey } from '@/types';
 import { DashboardAIChatSection } from '@/components/dashboard/DashboardAIChatSection';
+import { createClient } from '@/lib/supabase/client';
 
 interface LinkedElder {
   id: string;
@@ -92,7 +92,6 @@ interface SeniorGuardian {
 }
 
 export default function DashboardPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
   const [role, setRole] = useState<'CAREGIVER' | 'PROTECTED_USER' | null>(null);
@@ -130,11 +129,24 @@ export default function DashboardPage() {
   const [decidingId, setDecidingId] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  // When active user changes, immediately clear stale elder selection & states from memory
+  useEffect(() => {
+    setSelectedElderId('');
+    setLinkedElders([]);
+    setPendingApprovals([]);
+  }, [currentUser?.id]);
+
   const fetchSummary = useCallback(async () => {
     try {
-      const res = await fetch('/api/dashboard/summary');
+      const res = await fetch('/api/dashboard/summary', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
+      });
       if (res.status === 401) {
-        router.push('/auth/signin');
+        window.location.href = '/auth/signin';
         return;
       }
       const data = await res.json();
@@ -142,9 +154,13 @@ export default function DashboardPage() {
       setRole(data.role);
 
       if (data.role === 'CAREGIVER') {
-        setLinkedElders(data.linkedElders || []);
-        if (data.linkedElders?.length > 0 && !selectedElderId) {
-          setSelectedElderId(data.linkedElders[0].id);
+        const freshElders = data.linkedElders || [];
+        setLinkedElders(freshElders);
+        // Only set selected elder if valid in fresh elders list
+        if (freshElders.length > 0) {
+          setSelectedElderId((prev) => (freshElders.some((e: LinkedElder) => e.id === prev) ? prev : freshElders[0].id));
+        } else {
+          setSelectedElderId('');
         }
         setPendingApprovals(data.pendingApprovals || []);
       } else {
@@ -160,7 +176,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, selectedElderId]);
+  }, []);
 
   useEffect(() => {
     fetchSummary();
@@ -180,8 +196,12 @@ export default function DashboardPage() {
   };
 
   const handleLogout = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch {}
     await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/auth/signin');
+    window.location.href = '/auth/signin';
   };
 
   const handleDecision = async (approvalId: string, decision: 'APPROVED' | 'DECLINED') => {
@@ -311,28 +331,36 @@ export default function DashboardPage() {
 
           {/* Persona Switch & Logout */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center bg-black/[0.04] p-1 rounded-full border border-black/5">
-              <button
-                onClick={() => switchPersona('thomas')}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                  currentUser?.email.includes('thomas')
-                    ? 'bg-slate-950 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-950'
-                }`}
-              >
-                Mr. Thomas
-              </button>
-              <button
-                onClick={() => switchPersona('maya')}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                  currentUser?.email.includes('maya')
-                    ? 'bg-slate-950 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-950'
-                }`}
-              >
-                Maya
-              </button>
-            </div>
+            {currentUser?.isSynthetic && (
+              <div className="flex items-center bg-black/[0.04] p-1 rounded-full border border-black/5">
+                <button
+                  onClick={() => switchPersona('thomas')}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                    currentUser?.email.includes('thomas')
+                      ? 'bg-slate-950 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-950'
+                  }`}
+                >
+                  Mr. Thomas
+                </button>
+                <button
+                  onClick={() => switchPersona('maya')}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                    currentUser?.email.includes('maya')
+                      ? 'bg-slate-950 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-950'
+                  }`}
+                >
+                  Maya
+                </button>
+              </div>
+            )}
+
+            {!currentUser?.isSynthetic && currentUser && (
+              <div className="text-xs font-semibold text-slate-700 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200">
+                {currentUser.fullName}
+              </div>
+            )}
 
             <button
               onClick={handleLogout}
@@ -381,84 +409,114 @@ export default function DashboardPage() {
              ========================================================================= */
           <>
             {/* ELDER SELECTOR & STATS BAR */}
-            <div className="liquid-glass rounded-3xl p-6 sm:p-7 border border-white/80 shadow-[0_16px_40px_-12px_rgba(15,23,42,0.08)] flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-purple-700 bg-purple-100/70 px-2.5 py-0.5 rounded-full">
-                    Family Guardian Circle
-                  </span>
-                  <span className="text-xs text-slate-500 font-medium">Logged in as {currentUser?.fullName}</span>
+            {linkedElders.length === 0 ? (
+              <div className="liquid-glass rounded-3xl p-8 sm:p-12 border border-white/80 shadow-md text-center space-y-5">
+                <div className="w-16 h-16 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center mx-auto shadow-xs">
+                  <UserPlus className="w-8 h-8" />
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="space-y-1.5 max-w-lg mx-auto">
+                  <div className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full bg-purple-100/70 text-purple-800 text-xs font-semibold">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Caregiver Dashboard</span>
+                  </div>
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-950">
-                    Protecting: {activeElder?.fullName || 'Senior Member'}
+                    Welcome, {currentUser?.fullName || 'Caregiver'}!
                   </h1>
-                  {activeElder && (
-                    activeElder.permission?.canView ? (
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                        <ShieldCheck className="w-3.5 h-3.5" /> Shield Active
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    You haven’t connected an elderly loved one yet. Add your senior family member by sending them an invitation link to start protected PayPal monitoring.
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    onClick={() => setIsConnectModalOpen(true)}
+                    className="px-6 py-3 rounded-full bg-slate-950 hover:bg-slate-800 text-white font-semibold text-xs inline-flex items-center gap-2 shadow-lg shadow-slate-950/15 active:scale-95 transition-all"
+                  >
+                    <UserPlus className="w-4 h-4 text-emerald-400" />
+                    <span>Invite Senior Member</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="liquid-glass rounded-3xl p-6 sm:p-7 border border-white/80 shadow-[0_16px_40px_-12px_rgba(15,23,42,0.08)] flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-purple-700 bg-purple-100/70 px-2.5 py-0.5 rounded-full">
+                      Family Guardian Circle
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium">Logged in as {currentUser?.fullName}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-950">
+                      Protecting: {activeElder?.fullName || 'Senior Member'}
+                    </h1>
+                    {activeElder && (
+                      activeElder.permission?.canView ? (
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                          <ShieldCheck className="w-3.5 h-3.5" /> Shield Active
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" /> Awaiting Senior Consent
+                        </span>
+                      )
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-600">
+                    {currentUser?.email.includes('sarah') ? (
+                      <span className="inline-flex items-center gap-1 text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded-md">
+                        <Eye className="w-3.5 h-3.5" /> View-Only Access — Sarah can inspect transactions but cannot approve.
+                      </span>
+                    ) : !activeElder?.permission?.canView ? (
+                      <span className="inline-flex items-center gap-1 text-amber-800 font-semibold bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-200/60">
+                        <Clock className="w-3.5 h-3.5" /> Monitoring Paused: {activeElder?.fullName} must accept your family invitation before oversight activates.
                       </span>
                     ) : (
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" /> Awaiting Senior Consent
-                      </span>
-                    )
-                  )}
+                      `Relationship: ${activeElder?.relationship || 'Family'} • Authorized to approve held transactions.`
+                    )}
+                  </p>
                 </div>
-                <p className="text-sm text-slate-600">
-                  {currentUser?.email.includes('sarah') ? (
-                    <span className="inline-flex items-center gap-1 text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded-md">
-                      <Eye className="w-3.5 h-3.5" /> View-Only Access — Sarah can inspect transactions but cannot approve.
-                    </span>
-                  ) : !activeElder?.permission?.canView ? (
-                    <span className="inline-flex items-center gap-1 text-amber-800 font-semibold bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-200/60">
-                      <Clock className="w-3.5 h-3.5" /> Monitoring Paused: {activeElder?.fullName} must accept your family invitation before oversight activates.
-                    </span>
-                  ) : (
-                    `Relationship: ${activeElder?.relationship || 'Family'} • Authorized to approve held transactions.`
-                  )}
-                </p>
-              </div>
 
-              {/* Quick Actions & Add Elder */}
-              <div className="flex flex-wrap items-center gap-3">
-                {activeElder && (
-                  <>
-                    <Link
-                      href={`/checkout?elderId=${activeElder.id}`}
-                      className="liquid-pill px-3.5 py-2 text-xs font-semibold text-slate-900 flex items-center gap-1.5 shadow-2xs hover:bg-white active:scale-95 transition-all"
-                    >
-                      <ShoppingBag className="w-4 h-4 text-emerald-600" />
-                      <span>Simulate Checkout as {activeElder.fullName}</span>
-                    </Link>
-                    <button
-                      onClick={() => handleSwitchFamily(activeElder.id)}
-                      className="liquid-pill px-3.5 py-2 text-xs font-semibold text-slate-900 flex items-center gap-1.5 shadow-2xs hover:bg-white active:scale-95 transition-all"
-                      title="Switch session to experience SafePay through the senior's perspective"
-                    >
-                      <Eye className="w-4 h-4 text-purple-600" />
-                      <span>Switch to Senior View</span>
-                    </button>
-                  </>
-                )}
-                <button
-                  onClick={() => setIsConnectModalOpen(true)}
-                  className="liquid-pill px-4 py-2 text-xs font-semibold text-slate-900 flex items-center gap-1.5 shadow-2xs hover:bg-white active:scale-95 transition-all"
-                >
-                  <UserPlus className="w-4 h-4 text-purple-600" />
-                  <span>Connect Another Elder</span>
-                </button>
-                <button
-                  onClick={() => {
-                    document.getElementById('ai-chat-section')?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="px-4 py-2 rounded-full bg-slate-950 text-white text-xs font-semibold flex items-center gap-2 hover:bg-slate-800 active:scale-95 transition-all shadow-md shadow-slate-950/10"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Ask Caregiver AI</span>
-                </button>
+                {/* Quick Actions & Add Elder */}
+                <div className="flex flex-wrap items-center gap-3">
+                  {activeElder && (
+                    <>
+                      <Link
+                        href={`/checkout?elderId=${activeElder.id}`}
+                        className="liquid-pill px-3.5 py-2 text-xs font-semibold text-slate-900 flex items-center gap-1.5 shadow-2xs hover:bg-white active:scale-95 transition-all"
+                      >
+                        <ShoppingBag className="w-4 h-4 text-emerald-600" />
+                        <span>Simulate Checkout as {activeElder.fullName}</span>
+                      </Link>
+                      <button
+                        onClick={() => handleSwitchFamily(activeElder.id)}
+                        className="liquid-pill px-3.5 py-2 text-xs font-semibold text-slate-900 flex items-center gap-1.5 shadow-2xs hover:bg-white active:scale-95 transition-all"
+                        title="Switch session to experience SafePay through the senior's perspective"
+                      >
+                        <Eye className="w-4 h-4 text-purple-600" />
+                        <span>Switch to Senior View</span>
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => setIsConnectModalOpen(true)}
+                    className="liquid-pill px-4 py-2 text-xs font-semibold text-slate-900 flex items-center gap-1.5 shadow-2xs hover:bg-white active:scale-95 transition-all"
+                  >
+                    <UserPlus className="w-4 h-4 text-purple-600" />
+                    <span>Connect Another Elder</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      document.getElementById('ai-chat-section')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="px-4 py-2 rounded-full bg-slate-950 text-white text-xs font-semibold flex items-center gap-2 hover:bg-slate-800 active:scale-95 transition-all shadow-md shadow-slate-950/10"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Ask Caregiver AI</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* THREE METRICS CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -706,6 +764,7 @@ export default function DashboardPage() {
               </div>
 
               <DashboardAIChatSection
+                key={`${currentUser?.id || 'guest'}-${activeElder?.id || 'none'}`}
                 currentUser={currentUser}
                 elderName={activeElder?.fullName || 'Mr. Thomas'}
                 elderId={activeElder?.id}
@@ -724,44 +783,61 @@ export default function DashboardPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white/80 p-4 rounded-2xl border border-blue-100 shadow-2xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900">Maya Henderson</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
-                      Primary Approver
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500">Daughter • Full Approval Authority & Settings</p>
-                  <div className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> Approves holds, sets caps
-                  </div>
-                </div>
+                {currentUser?.isSynthetic ? (
+                  <>
+                    <div className="bg-white/80 p-4 rounded-2xl border border-blue-100 shadow-2xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900">Maya Sterling-Lin</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                          Primary Approver
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">Daughter • Full Approval Authority & Settings</p>
+                      <div className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Approves holds, sets caps
+                      </div>
+                    </div>
 
-                <div className="bg-white/80 p-4 rounded-2xl border border-indigo-100 shadow-2xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900">David Henderson</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
-                      Secondary Approver
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500">Son • Full Approval Authority</p>
-                  <div className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> Can approve high-risk orders
-                  </div>
-                </div>
+                    <div className="bg-white/80 p-4 rounded-2xl border border-indigo-100 shadow-2xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900">David Sterling</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                          Secondary Approver
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">Son • Full Approval Authority</p>
+                      <div className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Can approve high-risk orders
+                      </div>
+                    </div>
 
-                <div className="bg-white/80 p-4 rounded-2xl border border-amber-100 shadow-2xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900">Sarah Henderson</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                      Auditor (View-Only)
-                    </span>
+                    <div className="bg-white/80 p-4 rounded-2xl border border-amber-100 shadow-2xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900">Sarah Sterling</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                          Auditor (View-Only)
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">Granddaughter • Audit Visibility</p>
+                      <div className="text-[11px] text-slate-600 font-medium flex items-center gap-1">
+                        <Eye className="w-3 h-3 text-slate-400" /> Inspects activity, cannot approve
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="bg-white/80 p-4 rounded-2xl border border-emerald-100 shadow-2xs space-y-2 col-span-full sm:col-span-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900">{currentUser?.fullName || 'Caregiver'}</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                        Primary Approver (You)
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500">{currentUser?.email} • Account Owner</p>
+                    <div className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> Full Approval Authority & Family Link Management
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-500">Granddaughter • Audit Visibility</p>
-                  <div className="text-[11px] text-slate-600 font-medium flex items-center gap-1">
-                    <Eye className="w-3 h-3 text-slate-400" /> Inspects activity, cannot approve
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           </>

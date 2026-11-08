@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { generateSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
-import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,17 +52,7 @@ export async function POST(req: NextRequest) {
     // Generate authenticated session token
     const token = await generateSessionToken(user.id, user.email);
 
-    // Set cookie
-    const cookieStore = await cookies();
-    cookieStore.set(SESSION_COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: SESSION_MAX_AGE_SECONDS,
-    });
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       user: {
         id: user.id,
@@ -73,6 +62,16 @@ export async function POST(req: NextRequest) {
         isSynthetic: user.isSynthetic,
       },
     });
+
+    response.cookies.set(SESSION_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: SESSION_MAX_AGE_SECONDS,
+    });
+
+    return response;
   } catch (error: unknown) {
     console.error('Login error:', error);
     return NextResponse.json(

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { generateSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from '@/lib/auth';
-import { cookies } from 'next/headers';
 import { Role } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
@@ -51,16 +50,7 @@ export async function POST(req: NextRequest) {
     // 2. Issue session token
     const token = await generateSessionToken(user.id, user.email);
 
-    const cookieStore = await cookies();
-    cookieStore.set(SESSION_COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: SESSION_MAX_AGE_SECONDS,
-    });
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       message: 'Google authentication successful',
       user: {
@@ -70,6 +60,16 @@ export async function POST(req: NextRequest) {
         role: user.roleDefault,
       },
     });
+
+    response.cookies.set(SESSION_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: SESSION_MAX_AGE_SECONDS,
+    });
+
+    return response;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal error processing Google OAuth';
     return NextResponse.json({ error: message }, { status: 500 });

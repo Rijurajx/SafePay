@@ -76,15 +76,12 @@ export async function POST(req: NextRequest) {
       otpCode
     );
 
-    // In a live production environment, this triggers an SMTP email via SendGrid/Resend.
-    // In our PayPal Hackathon demo environment, we return demoCode so the user can easily test the code.
     return NextResponse.json({
       success: true,
       message: `A 6-digit verification code has been dispatched to ${normalizedEmail}`,
       email: normalizedEmail,
       fullName: trimmedName,
       verificationTicket,
-      demoCode: otpCode, // Provided for instant sandbox testing
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal error initiating registration';

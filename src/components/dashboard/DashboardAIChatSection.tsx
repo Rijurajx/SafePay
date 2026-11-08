@@ -49,6 +49,20 @@ export function DashboardAIChatSection({
   const defaultWelcomeMessage = useMemo<ChatMessage>(() => {
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+    if (!elderId) {
+      return {
+        id: 'welcome-no-elder',
+        role: 'assistant',
+        content: `Hello ${currentUser?.fullName || 'Caregiver'}! I am your **SafePay AI Assistant**.\n\nYou have not connected a senior family member yet. Once you send an invitation and your senior member connects, I will automatically monitor their transactions, evaluate anomalies in real time, and explain high-risk holds for you here.\n\nClick **"Invite Senior Member"** above to connect your loved one.`,
+        suggestedActions: [
+          'How does SafePay protect my elderly family member?',
+          'What happens when an unusual charge occurs?',
+          'What transactions can I approve or decline?',
+        ],
+        timestamp: time,
+      };
+    }
+
     if (latestHold) {
       return {
         id: `welcome-${elderId || 'default'}-${latestHold.id}`,
@@ -82,16 +96,12 @@ export function DashboardAIChatSection({
   const [copiedDraftId, setCopiedDraftId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Re-sync welcome message when elder or pending holds change
+  // Completely flush and reset chat session memory whenever currentUser or elder changes
   useEffect(() => {
-    setMessages((prev) => {
-      // If user has not started a multi-turn conversation yet, replace with current dynamic welcome
-      if (prev.length <= 1) {
-        return [defaultWelcomeMessage];
-      }
-      return prev;
-    });
-  }, [defaultWelcomeMessage]);
+    setMessages([defaultWelcomeMessage]);
+    setInput('');
+    setLoading(false);
+  }, [currentUser?.id, elderId, defaultWelcomeMessage]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

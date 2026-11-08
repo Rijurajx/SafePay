@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
 
     const authorizeUrl = `${supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(
       `${origin}/auth/callback`
-    )}`;
+    )}&prompt=select_account`;
 
     // Probe the Supabase authorize endpoint
     try {

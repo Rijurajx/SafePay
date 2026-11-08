@@ -1,13 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ShieldCheck, ArrowRight, Lock, Mail, Sparkles, AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 function SignInContent() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,7 +30,7 @@ function SignInContent() {
       if (!res.ok) {
         setError(data.error || 'Invalid credentials');
       } else {
-        router.push('/dashboard');
+        window.location.href = '/dashboard';
       }
     } catch {
       setError('Network error signing in. Please check your connection.');
@@ -71,12 +70,18 @@ function SignInContent() {
         return;
       }
 
-      // 2. Launch Supabase OAuth
+      // 2. Clear any stale client session & launch Supabase OAuth
       const supabase = createClient();
+      await supabase.auth.signOut().catch(() => {});
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            prompt: 'select_account',
+            access_type: 'offline',
+          },
         },
       });
 
@@ -119,7 +124,7 @@ function SignInContent() {
         }),
       });
       if (res.ok) {
-        router.push('/dashboard');
+        window.location.href = '/dashboard';
       } else {
         const d = await res.json();
         setError(d.error || 'Failed to sign in with sandbox Google account');
@@ -141,7 +146,7 @@ function SignInContent() {
         body: JSON.stringify({ persona: personaKey }),
       });
       if (res.ok) {
-        router.push('/dashboard');
+        window.location.href = '/dashboard';
       } else {
         const data = await res.json();
         setError(data.error || 'Failed to switch persona');
