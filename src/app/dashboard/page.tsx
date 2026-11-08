@@ -24,6 +24,8 @@ import {
   Check,
   Sliders,
   Edit2,
+  User,
+  Heart,
 } from 'lucide-react';
 import { SessionUser, DemoPersonaKey } from '@/types';
 import { DashboardAIChatSection } from '@/components/dashboard/DashboardAIChatSection';
@@ -150,12 +152,6 @@ export default function DashboardPage() {
   const [decidingId, setDecidingId] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // When active user changes, immediately clear stale elder selection & states from memory
-  useEffect(() => {
-    setSelectedElderId('');
-    setLinkedElders([]);
-    setPendingApprovals([]);
-  }, [currentUser?.id]);
 
   const fetchSummary = useCallback(async () => {
     try {
@@ -636,6 +632,120 @@ export default function DashboardPage() {
               </div>
             )}
 
+            {/* MULTI-ELDER SELECTOR (IF MULTIPLE ELDERS LINKED) */}
+            {linkedElders.length > 1 && (
+              <div className="flex flex-wrap items-center gap-2 p-3 bg-white/70 rounded-2xl border border-black/5">
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Select Protected Member:</span>
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {linkedElders.map((elder) => (
+                    <button
+                      key={elder.id}
+                      onClick={() => setSelectedElderId(elder.id)}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                        activeElder?.id === elder.id
+                          ? 'bg-slate-950 text-white shadow-xs'
+                          : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                      }`}
+                    >
+                      <Heart className="w-3 h-3 text-rose-400" />
+                      <span>{elder.fullName} ({elder.relationship})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* PROFILE & FAMILY OVERSIGHT DOSSIER */}
+            {activeElder && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* 1. Caregiver Profile Details */}
+                <div className="liquid-glass rounded-2xl p-5 border border-white/80 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs shadow-2xs">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-950">Caregiver Profile</h3>
+                        <p className="text-[11px] text-slate-500">Account Owner &amp; Primary Approver</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setProfileName(currentUser?.fullName || '');
+                        setIsProfileModalOpen(true);
+                      }}
+                      className="text-[11px] font-semibold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-full border border-purple-200/60 inline-flex items-center gap-1 transition-colors"
+                      title="Edit caregiver display name"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                      <span>Edit Name</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5 pt-1 text-xs">
+                    <div className="p-2.5 bg-white/70 rounded-xl border border-black/5">
+                      <span className="text-[10px] text-slate-500 font-semibold block uppercase">Display Name</span>
+                      <span className="font-bold text-slate-900 truncate block">{currentUser?.fullName}</span>
+                    </div>
+                    <div className="p-2.5 bg-white/70 rounded-xl border border-black/5">
+                      <span className="text-[10px] text-slate-500 font-semibold block uppercase">Registered Email</span>
+                      <span className="font-mono text-slate-800 text-[11px] truncate block">{currentUser?.email}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Connected Senior Profile Details */}
+                <div className="liquid-glass rounded-2xl p-5 border border-white/80 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs shadow-2xs">
+                        <Heart className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-950">{activeElder.fullName}&apos;s Profile</h3>
+                        <p className="text-[11px] text-slate-500">
+                          {activeElder.relationship} • {activeElder.permission?.canView ? 'Oversight Shield Active' : 'Awaiting Elder Acceptance'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={openLimitsModal}
+                      className="text-[11px] font-semibold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-full border border-purple-200/60 inline-flex items-center gap-1 transition-colors"
+                      title="Adjust safety limits for this senior"
+                    >
+                      <Sliders className="w-3 h-3" />
+                      <span>Adjust Limits</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 pt-1 text-xs">
+                    <div className="p-2 bg-white/70 rounded-xl border border-black/5">
+                      <span className="text-[10px] text-slate-500 font-semibold block uppercase">Approval Limit</span>
+                      <span className="font-bold text-purple-950 text-xs">
+                        ${(activeElder.protectionSettings.familyApprovalThreshold || 100).toFixed(0)}
+                      </span>
+                    </div>
+                    <div className="p-2 bg-white/70 rounded-xl border border-black/5">
+                      <span className="text-[10px] text-slate-500 font-semibold block uppercase">Daily Cap</span>
+                      <span className="font-bold text-emerald-950 text-xs">
+                        ${(activeElder.protectionSettings.absoluteDailyCap || 1000).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="p-2 bg-white/70 rounded-xl border border-black/5">
+                      <span className="text-[10px] text-slate-500 font-semibold block uppercase">Single Cap</span>
+                      <span className="font-bold text-slate-900 text-xs">
+                        ${(activeElder.protectionSettings.absoluteTransactionCap || 500).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* THREE METRICS CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {/* Card 1: Today's Spend */}
@@ -988,6 +1098,48 @@ export default function DashboardPage() {
              PROTECTED SENIOR VIEW (MR. THOMAS)
              ========================================================================= */
           <div className="max-w-4xl mx-auto space-y-8">
+            {/* SENIOR ACCOUNT & PROFILE DETAILS CARD */}
+            <div className="liquid-glass rounded-3xl p-6 sm:p-7 border border-white/80 shadow-[0_16px_40px_-12px_rgba(15,23,42,0.08)] space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shadow-2xs">
+                    <User className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-950">Your Senior Profile &amp; Account Safeguards</h2>
+                    <p className="text-xs text-slate-500">Protected family member account information</p>
+                  </div>
+                </div>
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1.5 shadow-2xs">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Shield Active
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="p-3.5 bg-white/70 rounded-2xl border border-black/5 space-y-1">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Your Full Name</span>
+                  <span className="font-extrabold text-slate-900 text-sm block">{currentUser?.fullName}</span>
+                  <span className="text-[10px] text-emerald-700 font-semibold block">Protected Senior Account</span>
+                </div>
+                <div className="p-3.5 bg-white/70 rounded-2xl border border-black/5 space-y-1">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Registered Email</span>
+                  <span className="font-mono text-slate-800 text-xs truncate block">{currentUser?.email}</span>
+                  <span className="text-[10px] text-slate-500 block">Single Sign-On Verified</span>
+                </div>
+                <div className="p-3.5 bg-white/70 rounded-2xl border border-black/5 space-y-1">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Primary Family Guardian</span>
+                  <span className="font-bold text-purple-900 text-xs block truncate">
+                    {seniorGuardians.length > 0
+                      ? `${seniorGuardians[0].fullName} (${seniorGuardians[0].relationship})`
+                      : 'Caregiver Linked'}
+                  </span>
+                  <span className="font-mono text-slate-500 text-[10px] block truncate">
+                    {seniorGuardians.length > 0 ? seniorGuardians[0].email : 'Connected Guardian'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* WARM WELCOME CARD */}
             <div className="liquid-glass rounded-3xl p-8 sm:p-10 border border-white/80 shadow-[0_20px_50px_-16px_rgba(15,23,42,0.1)] space-y-5">
               <div className="flex items-center gap-3">
