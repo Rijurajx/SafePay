@@ -190,15 +190,17 @@ export async function GET(req: NextRequest) {
         dailyCap: Number(elder?.protectionSettings?.absoluteDailyCap?.toString() || 1000),
         familyThreshold: Number(elder?.protectionSettings?.familyApprovalThreshold?.toString() || 100),
         monthlyBudget: Number(elder?.protectionSettings?.monthlyBudget?.toString() || 2000),
-        guardians: elder?.elderLinks.map((l) => ({
-          id: l.caregiver.id,
-          fullName: l.caregiver.fullName,
-          email: l.caregiver.email,
-          phoneNumber: l.caregiver.phoneNumber,
-          preferredNotification: l.caregiver.preferredNotification,
-          relationship: l.relationship,
-          canApprove: l.permission?.canApprovePayments ?? false,
-        })) || [],
+        guardians: elder?.elderLinks
+          ? elder.elderLinks.map((l) => ({
+              id: l.caregiver.id,
+              fullName: l.caregiver.fullName,
+              email: l.caregiver.email,
+              phoneNumber: l.caregiver.phoneNumber,
+              preferredNotification: l.caregiver.preferredNotification,
+              relationship: l.relationship,
+              canApprove: l.permission?.canApprovePayments ?? false,
+            }))
+          : [],
         activeHolds: activeHolds.map((h) => ({
           id: h.id,
           amount: Number(h.amount.toString()),
