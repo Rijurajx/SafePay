@@ -42,7 +42,10 @@ export async function POST(req: NextRequest) {
     let caregiverName = session.fullName;
 
     // 1. Update Caregiver's customized profile data
-    const caregiverData: Prisma.UserUpdateInput = {};
+    const caregiverData: Prisma.UserUpdateInput & {
+      phoneNumber?: string | null;
+      preferredNotification?: string | null;
+    } = {};
     if (fullName && typeof fullName === 'string' && fullName.trim()) {
       caregiverName = fullName.trim();
       caregiverData.fullName = caregiverName;
@@ -57,7 +60,7 @@ export async function POST(req: NextRequest) {
     if (Object.keys(caregiverData).length > 0) {
       await prisma.user.update({
         where: { id: session.id },
-        data: caregiverData,
+        data: caregiverData as Prisma.UserUpdateInput,
       });
     }
 
@@ -86,7 +89,13 @@ export async function POST(req: NextRequest) {
         where: { email: normalizedContact },
       });
 
-      const elderDataToSave: Prisma.UserUpdateInput = {
+      const elderDataToSave: Prisma.UserUpdateInput & {
+        phoneNumber?: string | null;
+        city?: string | null;
+        primaryZipCode?: string | null;
+        emergencyContactName?: string | null;
+        emergencyContactPhone?: string | null;
+      } = {
         fullName: trimmedElderName,
         ...(elderPhone ? { phoneNumber: String(elderPhone).trim() } : {}),
         ...(elderCity ? { city: String(elderCity).trim() } : {}),
@@ -108,12 +117,12 @@ export async function POST(req: NextRequest) {
             roleDefault: Role.PROTECTED_USER,
             isActive: false, // Inactive until elder accepts invite
             isSynthetic: false,
-          },
+          } as Prisma.UserCreateInput,
         });
       } else {
         elder = await prisma.user.update({
           where: { id: elder.id },
-          data: elderDataToSave,
+          data: elderDataToSave as Prisma.UserUpdateInput,
         });
       }
 

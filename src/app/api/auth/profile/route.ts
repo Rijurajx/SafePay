@@ -24,7 +24,15 @@ export async function PATCH(req: NextRequest) {
       dateOfBirth,
     } = body;
 
-    const dataToUpdate: Prisma.UserUpdateInput = {};
+    const dataToUpdate: Prisma.UserUpdateInput & {
+      phoneNumber?: string | null;
+      preferredNotification?: string | null;
+      city?: string | null;
+      primaryZipCode?: string | null;
+      emergencyContactName?: string | null;
+      emergencyContactPhone?: string | null;
+      dateOfBirth?: string | null;
+    } = {};
 
     if (fullName !== undefined) {
       if (typeof fullName !== 'string' || !fullName.trim()) {
@@ -65,7 +73,7 @@ export async function PATCH(req: NextRequest) {
 
     const updatedUser = await prisma.user.update({
       where: { id: session.id },
-      data: dataToUpdate,
+      data: dataToUpdate as Prisma.UserUpdateInput,
       select: {
         id: true,
         email: true,
