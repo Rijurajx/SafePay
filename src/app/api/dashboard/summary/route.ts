@@ -73,6 +73,11 @@ export async function GET(req: NextRequest) {
           id: l.elder.id,
           fullName: l.elder.fullName,
           email: l.elder.email,
+          phoneNumber: l.elder.phoneNumber,
+          city: l.elder.city,
+          primaryZipCode: l.elder.primaryZipCode,
+          emergencyContactName: l.elder.emergencyContactName,
+          emergencyContactPhone: l.elder.emergencyContactPhone,
           relationship: l.relationship,
           permission: {
             canView: l.permission?.canViewTransactions ?? true,
@@ -84,6 +89,7 @@ export async function GET(req: NextRequest) {
                 familyApprovalThreshold: Number(l.elder.protectionSettings.familyApprovalThreshold.toString()),
                 absoluteDailyCap: Number(l.elder.protectionSettings.absoluteDailyCap.toString()),
                 absoluteTransactionCap: Number(l.elder.protectionSettings.absoluteTransactionCap.toString()),
+                monthlyBudget: l.elder.protectionSettings.monthlyBudget ? Number(l.elder.protectionSettings.monthlyBudget.toString()) : null,
                 requireFamilyForNewRecipient: l.elder.protectionSettings.requireFamilyForNewRecipient,
                 requireFamilyForUnusual: l.elder.protectionSettings.requireFamilyForUnusual,
               }
@@ -91,6 +97,7 @@ export async function GET(req: NextRequest) {
                 familyApprovalThreshold: 100,
                 absoluteDailyCap: 1000,
                 absoluteTransactionCap: 500,
+                monthlyBudget: 2000,
                 requireFamilyForNewRecipient: true,
                 requireFamilyForUnusual: true,
               },
@@ -125,7 +132,15 @@ export async function GET(req: NextRequest) {
           elderLinks: {
             where: { status: FamilyLinkStatus.ACTIVE },
             include: {
-              caregiver: { select: { id: true, fullName: true, email: true } },
+              caregiver: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  email: true,
+                  phoneNumber: true,
+                  preferredNotification: true,
+                },
+              },
               permission: true,
             },
           },
@@ -166,10 +181,13 @@ export async function GET(req: NextRequest) {
         todaySpend: Number(todaySum._sum.amount?.toString() || 0),
         dailyCap: Number(elder?.protectionSettings?.absoluteDailyCap?.toString() || 1000),
         familyThreshold: Number(elder?.protectionSettings?.familyApprovalThreshold?.toString() || 100),
+        monthlyBudget: Number(elder?.protectionSettings?.monthlyBudget?.toString() || 2000),
         guardians: elder?.elderLinks.map((l) => ({
           id: l.caregiver.id,
           fullName: l.caregiver.fullName,
           email: l.caregiver.email,
+          phoneNumber: l.caregiver.phoneNumber,
+          preferredNotification: l.caregiver.preferredNotification,
           relationship: l.relationship,
           canApprove: l.permission?.canApprovePayments ?? false,
         })) || [],

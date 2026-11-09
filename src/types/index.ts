@@ -21,6 +21,13 @@ export interface SessionUser {
   fullName: string;
   roleDefault: Role;
   isSynthetic: boolean;
+  phoneNumber?: string | null;
+  city?: string | null;
+  primaryZipCode?: string | null;
+  dateOfBirth?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  preferredNotification?: string | null;
 }
 
 export interface CaregiverContext {

@@ -26,6 +26,9 @@ import {
   Edit2,
   User,
   Heart,
+  Phone,
+  Bell,
+  MapPin,
 } from 'lucide-react';
 import { SessionUser, DemoPersonaKey } from '@/types';
 import { DashboardAIChatSection } from '@/components/dashboard/DashboardAIChatSection';
@@ -35,6 +38,11 @@ interface LinkedElder {
   id: string;
   fullName: string;
   email: string;
+  phoneNumber?: string | null;
+  city?: string | null;
+  primaryZipCode?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
   relationship: string;
   permission: {
     canView: boolean;
@@ -45,6 +53,7 @@ interface LinkedElder {
     familyApprovalThreshold: number;
     absoluteDailyCap: number;
     absoluteTransactionCap?: number;
+    monthlyBudget?: number | null;
     requireFamilyForNewRecipient?: boolean;
     requireFamilyForUnusual?: boolean;
   };
@@ -94,6 +103,8 @@ interface SeniorGuardian {
   id: string;
   fullName: string;
   email: string;
+  phoneNumber?: string | null;
+  preferredNotification?: string | null;
   relationship: string;
   canApprove: boolean;
 }
@@ -128,6 +139,7 @@ export default function DashboardPage() {
   const [seniorTodaySpend, setSeniorTodaySpend] = useState<number>(0);
   const [seniorDailyCap, setSeniorDailyCap] = useState<number>(1000);
   const [seniorFamilyThreshold, setSeniorFamilyThreshold] = useState<number>(100);
+  const [seniorMonthlyBudget, setSeniorMonthlyBudget] = useState<number>(2000);
   const [seniorGuardians, setSeniorGuardians] = useState<SeniorGuardian[]>([]);
   const [seniorHolds, setSeniorHolds] = useState<SeniorHold[]>([]);
   const [seniorRecentPayments, setSeniorRecentPayments] = useState<RecentPayment[]>([]);
@@ -135,6 +147,12 @@ export default function DashboardPage() {
   // Profile edit modal state
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileName, setProfileName] = useState('');
+  const [profilePhone, setProfilePhone] = useState('');
+  const [profileNotification, setProfileNotification] = useState<'BOTH' | 'SMS' | 'EMAIL'>('BOTH');
+  const [profileCity, setProfileCity] = useState('');
+  const [profileZip, setProfileZip] = useState('');
+  const [profileEmergencyName, setProfileEmergencyName] = useState('');
+  const [profileEmergencyPhone, setProfileEmergencyPhone] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
@@ -143,6 +161,7 @@ export default function DashboardPage() {
   const [limitThreshold, setLimitThreshold] = useState('100');
   const [limitDailyCap, setLimitDailyCap] = useState('1000');
   const [limitTransactionCap, setLimitTransactionCap] = useState('500');
+  const [limitMonthlyBudget, setLimitMonthlyBudget] = useState('2000');
   const [limitNewMerchant, setLimitNewMerchant] = useState(true);
   const [limitUnusual, setLimitUnusual] = useState(true);
   const [limitsSaving, setLimitsSaving] = useState(false);
@@ -184,6 +203,7 @@ export default function DashboardPage() {
         setSeniorTodaySpend(data.todaySpend || 0);
         setSeniorDailyCap(data.dailyCap || 1000);
         setSeniorFamilyThreshold(data.familyThreshold || 100);
+        setSeniorMonthlyBudget(data.monthlyBudget || 2000);
         setSeniorGuardians(data.guardians || []);
         setSeniorHolds(data.activeHolds || []);
         setSeniorRecentPayments(data.recentPayments || []);
@@ -281,6 +301,18 @@ export default function DashboardPage() {
     }
   };
 
+  const openProfileModal = () => {
+    setProfileName(currentUser?.fullName || '');
+    setProfilePhone(currentUser?.phoneNumber || '');
+    setProfileNotification((currentUser?.preferredNotification as 'BOTH' | 'SMS' | 'EMAIL') || 'BOTH');
+    setProfileCity(currentUser?.city || '');
+    setProfileZip(currentUser?.primaryZipCode || '');
+    setProfileEmergencyName(currentUser?.emergencyContactName || '');
+    setProfileEmergencyPhone(currentUser?.emergencyContactPhone || '');
+    setProfileError(null);
+    setIsProfileModalOpen(true);
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profileName.trim()) return;
@@ -290,20 +322,29 @@ export default function DashboardPage() {
       const res = await fetch('/api/auth/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullName: profileName.trim() }),
+        body: JSON.stringify({
+          fullName: profileName.trim(),
+          phoneNumber: profilePhone.trim() || null,
+          preferredNotification: profileNotification,
+          city: profileCity.trim() || null,
+          primaryZipCode: profileZip.trim() || null,
+          emergencyContactName: profileEmergencyName.trim() || null,
+          emergencyContactPhone: profileEmergencyPhone.trim() || null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
         setProfileError(data.error || 'Failed to update profile');
       } else {
         if (currentUser) {
-          setCurrentUser({ ...currentUser, fullName: data.user.fullName });
+          setCurrentUser({ ...currentUser, ...data.user });
         }
         setActionNotice({
-          message: 'Caregiver profile username updated successfully!',
+          message: 'Caregiver profile updated successfully!',
           type: 'success',
         });
         setIsProfileModalOpen(false);
+        await fetchSummary();
       }
     } catch {
       setProfileError('Network error updating profile');
@@ -317,6 +358,7 @@ export default function DashboardPage() {
     setLimitThreshold(String(activeElder.protectionSettings.familyApprovalThreshold || 100));
     setLimitDailyCap(String(activeElder.protectionSettings.absoluteDailyCap || 1000));
     setLimitTransactionCap(String(activeElder.protectionSettings.absoluteTransactionCap || 500));
+    setLimitMonthlyBudget(String(activeElder.protectionSettings.monthlyBudget || 2000));
     setLimitNewMerchant(activeElder.protectionSettings.requireFamilyForNewRecipient ?? true);
     setLimitUnusual(activeElder.protectionSettings.requireFamilyForUnusual ?? true);
     setLimitsError(null);
@@ -337,6 +379,7 @@ export default function DashboardPage() {
           familyApprovalThreshold: Number(limitThreshold) || 100,
           absoluteDailyCap: Number(limitDailyCap) || 1000,
           absoluteTransactionCap: Number(limitTransactionCap) || 500,
+          monthlyBudget: Number(limitMonthlyBudget) || 2000,
           requireFamilyForNewRecipient: limitNewMerchant,
           requireFamilyForUnusual: limitUnusual,
         }),
@@ -662,7 +705,7 @@ export default function DashboardPage() {
             {activeElder && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* 1. Caregiver Profile Details */}
-                <div className="liquid-glass rounded-2xl p-5 border border-white/80 shadow-sm space-y-3">
+                <div className="liquid-glass rounded-2xl p-5 border border-white/80 shadow-sm space-y-3.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs shadow-2xs">
@@ -674,19 +717,16 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <button
-                      onClick={() => {
-                        setProfileName(currentUser?.fullName || '');
-                        setIsProfileModalOpen(true);
-                      }}
+                      onClick={openProfileModal}
                       className="text-[11px] font-semibold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-full border border-purple-200/60 inline-flex items-center gap-1 transition-colors"
-                      title="Edit caregiver display name"
+                      title="Edit caregiver profile and alerts"
                     >
                       <Edit2 className="w-3 h-3" />
-                      <span>Edit Name</span>
+                      <span>Edit Profile</span>
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5 pt-1 text-xs">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="p-2.5 bg-white/70 rounded-xl border border-black/5">
                       <span className="text-[10px] text-slate-500 font-semibold block uppercase">Display Name</span>
                       <span className="font-bold text-slate-900 truncate block">{currentUser?.fullName}</span>
@@ -695,11 +735,52 @@ export default function DashboardPage() {
                       <span className="text-[10px] text-slate-500 font-semibold block uppercase">Registered Email</span>
                       <span className="font-mono text-slate-800 text-[11px] truncate block">{currentUser?.email}</span>
                     </div>
+                    <div className="p-2.5 bg-white/70 rounded-xl border border-black/5">
+                      <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-1 uppercase">
+                        <Phone className="w-2.5 h-2.5 text-slate-400" />
+                        <span>Mobile (SMS)</span>
+                      </span>
+                      <span className="font-mono text-slate-900 text-[11px] font-semibold truncate block mt-0.5">
+                        {currentUser?.phoneNumber || (
+                          <span className="text-amber-600 font-sans font-medium text-[10px]">Add for 1-tap SMS</span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="p-2.5 bg-white/70 rounded-xl border border-black/5">
+                      <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-1 uppercase">
+                        <Bell className="w-2.5 h-2.5 text-slate-400" />
+                        <span>Alerts Channel</span>
+                      </span>
+                      <span className="text-purple-900 font-bold text-[11px] block mt-0.5">
+                        {currentUser?.preferredNotification === 'SMS'
+                          ? 'SMS Text'
+                          : currentUser?.preferredNotification === 'EMAIL'
+                          ? 'Email Only'
+                          : 'Both SMS & Email'}
+                      </span>
+                    </div>
                   </div>
+
+                  {(currentUser?.emergencyContactName || currentUser?.city) && (
+                    <div className="pt-2 border-t border-slate-200/50 flex flex-wrap items-center justify-between text-[11px] text-slate-600 px-1">
+                      {currentUser?.city && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-slate-400" />
+                          <span>{currentUser.city}{currentUser.primaryZipCode ? `, ${currentUser.primaryZipCode}` : ''}</span>
+                        </span>
+                      )}
+                      {currentUser?.emergencyContactName && (
+                        <span className="flex items-center gap-1">
+                          <Heart className="w-3 h-3 text-rose-500" />
+                          <span>Backup: {currentUser.emergencyContactName} ({currentUser.emergencyContactPhone || 'No phone'})</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. Connected Senior Profile Details */}
-                <div className="liquid-glass rounded-2xl p-5 border border-white/80 shadow-sm space-y-3">
+                <div className="liquid-glass rounded-2xl p-5 border border-white/80 shadow-sm space-y-3.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs shadow-2xs">
@@ -722,26 +803,59 @@ export default function DashboardPage() {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 pt-1 text-xs">
+                  {/* Senior Metadata: Phone, Geo-Location & Emergency Backup */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="p-2 bg-white/70 rounded-xl border border-black/5">
-                      <span className="text-[10px] text-slate-500 font-semibold block uppercase">Approval Limit</span>
+                      <span className="text-[10px] text-slate-500 font-semibold block uppercase">Senior Contact</span>
+                      <span className="font-mono text-slate-800 text-[11px] truncate block">
+                        {activeElder.phoneNumber || activeElder.email}
+                      </span>
+                    </div>
+                    <div className="p-2 bg-white/70 rounded-xl border border-black/5">
+                      <span className="text-[10px] text-slate-500 font-semibold block uppercase">Geo-Baseline</span>
+                      <span className="font-bold text-slate-800 text-xs truncate block flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span>{activeElder.city ? `${activeElder.city} ${activeElder.primaryZipCode || ''}` : 'Local Baseline'}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Financial Guardrails Grid */}
+                  <div className="grid grid-cols-4 gap-1.5 pt-0.5 text-xs">
+                    <div className="p-2 bg-white/70 rounded-xl border border-black/5">
+                      <span className="text-[9px] text-slate-500 font-semibold block uppercase">Approval Limit</span>
                       <span className="font-bold text-purple-950 text-xs">
                         ${(activeElder.protectionSettings.familyApprovalThreshold || 100).toFixed(0)}
                       </span>
                     </div>
                     <div className="p-2 bg-white/70 rounded-xl border border-black/5">
-                      <span className="text-[10px] text-slate-500 font-semibold block uppercase">Daily Cap</span>
+                      <span className="text-[9px] text-slate-500 font-semibold block uppercase">Daily Cap</span>
                       <span className="font-bold text-emerald-950 text-xs">
                         ${(activeElder.protectionSettings.absoluteDailyCap || 1000).toLocaleString()}
                       </span>
                     </div>
                     <div className="p-2 bg-white/70 rounded-xl border border-black/5">
-                      <span className="text-[10px] text-slate-500 font-semibold block uppercase">Single Cap</span>
+                      <span className="text-[9px] text-slate-500 font-semibold block uppercase">Monthly Budget</span>
+                      <span className="font-bold text-blue-950 text-xs">
+                        ${(activeElder.protectionSettings.monthlyBudget || 2000).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="p-2 bg-white/70 rounded-xl border border-black/5">
+                      <span className="text-[9px] text-slate-500 font-semibold block uppercase">Single Cap</span>
                       <span className="font-bold text-slate-900 text-xs">
                         ${(activeElder.protectionSettings.absoluteTransactionCap || 500).toLocaleString()}
                       </span>
                     </div>
                   </div>
+
+                  {activeElder.emergencyContactName && (
+                    <div className="pt-1.5 border-t border-slate-200/50 flex items-center justify-between text-[11px] text-slate-600 px-1">
+                      <span className="flex items-center gap-1">
+                        <Heart className="w-3 h-3 text-rose-500" />
+                        <span>Backup Guardian: {activeElder.emergencyContactName} ({activeElder.emergencyContactPhone || 'No phone'})</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1122,9 +1236,11 @@ export default function DashboardPage() {
                   <span className="text-[10px] text-emerald-700 font-semibold block">Protected Senior Account</span>
                 </div>
                 <div className="p-3.5 bg-white/70 rounded-2xl border border-black/5 space-y-1">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Registered Email</span>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Account Contact</span>
                   <span className="font-mono text-slate-800 text-xs truncate block">{currentUser?.email}</span>
-                  <span className="text-[10px] text-slate-500 block">Single Sign-On Verified</span>
+                  <span className="text-[10px] text-slate-500 block truncate">
+                    {currentUser?.phoneNumber ? `Mobile: ${currentUser.phoneNumber}` : 'SSO Verified'}
+                  </span>
                 </div>
                 <div className="p-3.5 bg-white/70 rounded-2xl border border-black/5 space-y-1">
                   <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Primary Family Guardian</span>
@@ -1138,6 +1254,39 @@ export default function DashboardPage() {
                   </span>
                 </div>
               </div>
+
+              {(currentUser?.city || currentUser?.emergencyContactName || seniorMonthlyBudget) && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-xs">
+                  <div className="p-2.5 bg-white/60 rounded-xl border border-black/5 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] text-slate-500 font-semibold uppercase block">Monthly Budget</span>
+                      <span className="font-bold text-slate-900 text-xs">${seniorMonthlyBudget.toLocaleString()}</span>
+                    </div>
+                    <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full font-bold">Planned</span>
+                  </div>
+
+                  <div className="p-2.5 bg-white/60 rounded-xl border border-black/5 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] text-slate-500 font-semibold uppercase block">Home Baseline</span>
+                      <span className="font-bold text-slate-900 text-xs flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-slate-400" />
+                        <span>{currentUser?.city ? `${currentUser.city} ${currentUser.primaryZipCode || ''}` : 'Local Region'}</span>
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold">AI Active</span>
+                  </div>
+
+                  <div className="p-2.5 bg-white/60 rounded-xl border border-black/5 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] text-slate-500 font-semibold uppercase block">Emergency Backup</span>
+                      <span className="font-bold text-slate-900 text-xs truncate block">
+                        {currentUser?.emergencyContactName ? `${currentUser.emergencyContactName}` : 'Family Guardian'}
+                      </span>
+                    </div>
+                    <Heart className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* WARM WELCOME CARD */}
@@ -1506,7 +1655,7 @@ export default function DashboardPage() {
       {/* CAREGIVER PROFILE EDIT MODAL */}
       {isProfileModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="liquid-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-white shadow-2xl relative space-y-5">
+          <div className="liquid-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-white shadow-2xl relative space-y-5 max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setIsProfileModalOpen(false)}
               className="absolute top-5 right-5 p-2 rounded-full hover:bg-black/5 text-slate-500"
@@ -1522,7 +1671,7 @@ export default function DashboardPage() {
                 <h3 className="text-lg font-bold text-slate-950">Edit Caregiver Profile</h3>
               </div>
               <p className="text-xs text-slate-600">
-                Update your display name and username visible to your family members.
+                Update your display name, SMS approval phone number, and alert channels.
               </p>
             </div>
 
@@ -1554,9 +1703,86 @@ export default function DashboardPage() {
                 <div className="px-3.5 py-2.5 rounded-xl bg-slate-100/80 border border-slate-200/60 text-slate-600 text-xs font-mono">
                   {currentUser?.email}
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  Primary security identifier for this Caregiver account.
-                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Mobile Phone (for SMS Approvals):
+                  </label>
+                  <input
+                    type="tel"
+                    value={profilePhone}
+                    onChange={(e) => setProfilePhone(e.target.value)}
+                    placeholder="e.g. +1 (555) 234-5678"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 outline-none transition-all"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">Used for 1-click SMS decision links.</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Alerts Channel:
+                  </label>
+                  <select
+                    value={profileNotification}
+                    onChange={(e) => setProfileNotification(e.target.value as 'BOTH' | 'SMS' | 'EMAIL')}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 outline-none transition-all"
+                  >
+                    <option value="BOTH">Both SMS &amp; Email</option>
+                    <option value="SMS">SMS Text Only</option>
+                    <option value="EMAIL">Email Only</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Primary City:
+                  </label>
+                  <input
+                    type="text"
+                    value={profileCity}
+                    onChange={(e) => setProfileCity(e.target.value)}
+                    placeholder="e.g. Austin"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Primary Zip Code:
+                  </label>
+                  <input
+                    type="text"
+                    value={profileZip}
+                    onChange={(e) => setProfileZip(e.target.value)}
+                    placeholder="e.g. 78701"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200/60 space-y-2">
+                <label className="block text-xs font-semibold text-slate-700">
+                  Emergency Backup Guardian (Optional):
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    value={profileEmergencyName}
+                    onChange={(e) => setProfileEmergencyName(e.target.value)}
+                    placeholder="Contact Name (e.g. Aunt Sarah)"
+                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 outline-none transition-all"
+                  />
+                  <input
+                    type="tel"
+                    value={profileEmergencyPhone}
+                    onChange={(e) => setProfileEmergencyPhone(e.target.value)}
+                    placeholder="Contact Phone"
+                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 outline-none transition-all"
+                  />
+                </div>
               </div>
 
               <div className="pt-2 flex items-center gap-2.5">
@@ -1663,25 +1889,48 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Absolute Single Transaction Ceiling ($):
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">$</span>
-                  <input
-                    type="number"
-                    required
-                    min="50"
-                    step="50"
-                    value={limitTransactionCap}
-                    onChange={(e) => setLimitTransactionCap(e.target.value)}
-                    className="w-full pl-7 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-bold focus:ring-2 focus:ring-purple-600 outline-none"
-                  />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Target Monthly Budget ($):
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">$</span>
+                    <input
+                      type="number"
+                      required
+                      min="100"
+                      step="50"
+                      value={limitMonthlyBudget}
+                      onChange={(e) => setLimitMonthlyBudget(e.target.value)}
+                      className="w-full pl-7 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-bold focus:ring-2 focus:ring-purple-600 outline-none"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    Target monthly spending ceiling
+                  </span>
                 </div>
-                <span className="text-[10px] text-slate-500 mt-1 block">
-                  Hard block limit for any single purchase
-                </span>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Absolute Single Transaction Ceiling ($):
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">$</span>
+                    <input
+                      type="number"
+                      required
+                      min="50"
+                      step="50"
+                      value={limitTransactionCap}
+                      onChange={(e) => setLimitTransactionCap(e.target.value)}
+                      className="w-full pl-7 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-bold focus:ring-2 focus:ring-purple-600 outline-none"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    Hard block limit for any single purchase
+                  </span>
+                </div>
               </div>
 
               {/* Guardrails Checkboxes */}

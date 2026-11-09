@@ -15,6 +15,10 @@ import {
   Copy,
   Check,
   RefreshCw,
+  Phone,
+  Bell,
+  MapPin,
+  Heart,
 } from 'lucide-react';
 
 export default function OnboardingPage() {
@@ -25,11 +29,20 @@ export default function OnboardingPage() {
   // Caregiver Profile State
   const [caregiverEmail, setCaregiverEmail] = useState('');
   const [fullName, setFullName] = useState('');
+  const [caregiverPhone, setCaregiverPhone] = useState('');
+  const [caregiverNotification, setCaregiverNotification] = useState<'BOTH' | 'SMS' | 'EMAIL'>('BOTH');
 
   // Elder Profile State
   const [elderFullName, setElderFullName] = useState('');
   const [elderEmailOrPhone, setElderEmailOrPhone] = useState('');
+  const [elderPhone, setElderPhone] = useState('');
+  const [elderCity, setElderCity] = useState('');
+  const [elderZipCode, setElderZipCode] = useState('');
   const [relationship, setRelationship] = useState('Parent');
+
+  // Emergency Backup Contact State
+  const [emergencyContactName, setEmergencyContactName] = useState('');
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState('');
 
   // Protection Limits State
   const [familyApprovalThreshold, setFamilyApprovalThreshold] = useState('100');
@@ -59,6 +72,8 @@ export default function OnboardingPage() {
           setCaregiverEmail(data.user.email || '');
           // Prefill with Google OAuth name or existing name
           setFullName(data.user.fullName || data.user.email?.split('@')[0] || '');
+          if (data.user.phoneNumber) setCaregiverPhone(data.user.phoneNumber);
+          if (data.user.preferredNotification) setCaregiverNotification(data.user.preferredNotification);
         }
       } catch (err) {
         console.error('Failed to load session:', err);
@@ -85,12 +100,20 @@ export default function OnboardingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fullName: fullName.trim(),
+          caregiverPhone: caregiverPhone.trim() || undefined,
+          caregiverNotification,
           elderFullName: elderFullName.trim() || undefined,
           elderEmailOrPhone: elderEmailOrPhone.trim() || undefined,
+          elderPhone: elderPhone.trim() || undefined,
+          elderCity: elderCity.trim() || undefined,
+          elderZipCode: elderZipCode.trim() || undefined,
+          emergencyContactName: emergencyContactName.trim() || undefined,
+          emergencyContactPhone: emergencyContactPhone.trim() || undefined,
           relationship,
           familyApprovalThreshold: Number(familyApprovalThreshold) || 100,
           absoluteDailyCap: Number(absoluteDailyCap) || 500,
           absoluteTransactionCap: (Number(familyApprovalThreshold) || 100) * 5,
+          monthlyBudget: Number(monthlyBudget) || 2000,
           requireFamilyForNewRecipient: requireNewMerchant,
           requireFamilyForUnusual: requireUnusual,
         }),
@@ -220,6 +243,48 @@ export default function OnboardingPage() {
                       <span>{caregiverEmail}</span>
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Mobile Phone (for SMS Approvals):
+                      </label>
+                      <div className="relative">
+                        <Phone className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="tel"
+                          value={caregiverPhone}
+                          onChange={(e) => setCaregiverPhone(e.target.value)}
+                          placeholder="e.g. +1 (555) 234-5678"
+                          className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 outline-none transition-all shadow-2xs"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Instant SMS alerts for 1-tap fast approvals.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Preferred Alerts Channel:
+                      </label>
+                      <div className="relative">
+                        <Bell className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        <select
+                          value={caregiverNotification}
+                          onChange={(e) => setCaregiverNotification(e.target.value as 'BOTH' | 'SMS' | 'EMAIL')}
+                          className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 outline-none transition-all shadow-2xs"
+                        >
+                          <option value="BOTH">Both SMS &amp; Email (Recommended)</option>
+                          <option value="SMS">SMS Text Only</option>
+                          <option value="EMAIL">Email Only</option>
+                        </select>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        How you wish to receive hold alerts.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -268,17 +333,90 @@ export default function OnboardingPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Senior&apos;s Email or Phone Number:
+                    Senior&apos;s Email (for Invitation):
                   </label>
                   <input
                     type="text"
                     value={elderEmailOrPhone}
                     onChange={(e) => setElderEmailOrPhone(e.target.value)}
-                    placeholder="e.g. senior@gmail.com or +1 (555) 234-5678"
+                    placeholder="e.g. senior@gmail.com"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 outline-none transition-all shadow-2xs"
                   />
                   <p className="text-[11px] text-slate-500 mt-1">
                     An invitation link will be generated for the senior to accept monitoring.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Senior&apos;s Mobile Phone (Optional):
+                    </label>
+                    <div className="relative">
+                      <Phone className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="tel"
+                        value={elderPhone}
+                        onChange={(e) => setElderPhone(e.target.value)}
+                        placeholder="e.g. +1 (555) 876-5432"
+                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 outline-none transition-all shadow-2xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Senior&apos;s City &amp; Zip (Geo-Baseline):
+                    </label>
+                    <div className="relative flex gap-2">
+                      <div className="relative flex-1">
+                        <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={elderCity}
+                          onChange={(e) => setElderCity(e.target.value)}
+                          placeholder="City"
+                          className="w-full pl-9 pr-2.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 outline-none transition-all shadow-2xs"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        value={elderZipCode}
+                        onChange={(e) => setElderZipCode(e.target.value)}
+                        placeholder="Zip"
+                        className="w-24 px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 outline-none transition-all shadow-2xs"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Used by AI to flag unexpected out-of-town fraud.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Emergency Backup Contact */}
+                <div className="pt-2 border-t border-slate-200/60">
+                  <div className="flex items-center gap-1.5 mb-2 text-xs font-semibold text-slate-700">
+                    <Heart className="w-3.5 h-3.5 text-rose-500" />
+                    <span>Emergency Backup Contact (Optional):</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      value={emergencyContactName}
+                      onChange={(e) => setEmergencyContactName(e.target.value)}
+                      placeholder="Backup Contact Name (e.g. Aunt Sarah)"
+                      className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 outline-none transition-all shadow-2xs"
+                    />
+                    <input
+                      type="tel"
+                      value={emergencyContactPhone}
+                      onChange={(e) => setEmergencyContactPhone(e.target.value)}
+                      placeholder="Backup Phone Number"
+                      className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 outline-none transition-all shadow-2xs"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Secondary contact if caregiver is unreachable during critical blocks.
                   </p>
                 </div>
               </div>

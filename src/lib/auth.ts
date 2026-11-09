@@ -154,6 +154,13 @@ export async function getSessionUser(req?: NextRequest): Promise<SessionUser | n
         id: true,
         email: true,
         fullName: true,
+        phoneNumber: true,
+        city: true,
+        primaryZipCode: true,
+        dateOfBirth: true,
+        emergencyContactName: true,
+        emergencyContactPhone: true,
+        preferredNotification: true,
         roleDefault: true,
         isSynthetic: true,
         isActive: true,
@@ -168,6 +175,13 @@ export async function getSessionUser(req?: NextRequest): Promise<SessionUser | n
       fullName: user.fullName,
       roleDefault: user.roleDefault,
       isSynthetic: user.isSynthetic,
+      phoneNumber: user.phoneNumber,
+      city: user.city,
+      primaryZipCode: user.primaryZipCode,
+      dateOfBirth: user.dateOfBirth,
+      emergencyContactName: user.emergencyContactName,
+      emergencyContactPhone: user.emergencyContactPhone,
+      preferredNotification: user.preferredNotification,
     };
   } catch {
     return null;

@@ -21,24 +21,43 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       fullName,
+      caregiverPhone,
+      caregiverNotification = 'BOTH',
       elderFullName,
       elderEmailOrPhone,
+      elderPhone,
+      elderCity,
+      elderZipCode,
       relationship = 'Parent',
       familyApprovalThreshold = 100,
       absoluteDailyCap = 500,
       absoluteTransactionCap = 1000,
+      monthlyBudget = 2000,
       requireFamilyForNewRecipient = true,
       requireFamilyForUnusual = true,
+      emergencyContactName,
+      emergencyContactPhone,
     } = body;
 
     let caregiverName = session.fullName;
 
-    // 1. Update Caregiver's customized name/username if provided
+    // 1. Update Caregiver's customized profile data
+    const caregiverData: Record<string, unknown> = {};
     if (fullName && typeof fullName === 'string' && fullName.trim()) {
       caregiverName = fullName.trim();
+      caregiverData.fullName = caregiverName;
+    }
+    if (caregiverPhone) {
+      caregiverData.phoneNumber = String(caregiverPhone).trim();
+    }
+    if (caregiverNotification) {
+      caregiverData.preferredNotification = caregiverNotification;
+    }
+
+    if (Object.keys(caregiverData).length > 0) {
       await prisma.user.update({
         where: { id: session.id },
-        data: { fullName: caregiverName },
+        data: caregiverData,
       });
     }
 
@@ -60,17 +79,27 @@ export async function POST(req: NextRequest) {
       const thresholdNum = Number(familyApprovalThreshold) || 100;
       const dailyCapNum = Number(absoluteDailyCap) || 500;
       const transCapNum = Number(absoluteTransactionCap) || 1000;
+      const monthlyBudgetNum = Number(monthlyBudget) || 2000;
 
       // 2a. Find or create elder user
       let elder = await prisma.user.findUnique({
         where: { email: normalizedContact },
       });
 
+      const elderDataToSave = {
+        fullName: trimmedElderName,
+        ...(elderPhone ? { phoneNumber: String(elderPhone).trim() } : {}),
+        ...(elderCity ? { city: String(elderCity).trim() } : {}),
+        ...(elderZipCode ? { primaryZipCode: String(elderZipCode).trim() } : {}),
+        ...(emergencyContactName ? { emergencyContactName: String(emergencyContactName).trim() } : {}),
+        ...(emergencyContactPhone ? { emergencyContactPhone: String(emergencyContactPhone).trim() } : {}),
+      };
+
       if (!elder) {
         elder = await prisma.user.create({
           data: {
             email: normalizedContact,
-            fullName: trimmedElderName,
+            ...elderDataToSave,
             roleDefault: Role.PROTECTED_USER,
             isActive: false, // Inactive until elder accepts invite
             isSynthetic: false,
@@ -79,9 +108,7 @@ export async function POST(req: NextRequest) {
       } else {
         elder = await prisma.user.update({
           where: { id: elder.id },
-          data: {
-            fullName: trimmedElderName,
-          },
+          data: elderDataToSave,
         });
       }
 
@@ -96,6 +123,7 @@ export async function POST(req: NextRequest) {
           familyApprovalThreshold: new Decimal(thresholdNum),
           absoluteDailyCap: new Decimal(dailyCapNum),
           absoluteTransactionCap: new Decimal(transCapNum),
+          monthlyBudget: new Decimal(monthlyBudgetNum),
           requireFamilyForNewRecipient: Boolean(requireFamilyForNewRecipient),
           requireFamilyForUnusual: Boolean(requireFamilyForUnusual),
           approvalTimeoutMinutes: 30,
@@ -104,6 +132,7 @@ export async function POST(req: NextRequest) {
           familyApprovalThreshold: new Decimal(thresholdNum),
           absoluteDailyCap: new Decimal(dailyCapNum),
           absoluteTransactionCap: new Decimal(transCapNum),
+          monthlyBudget: new Decimal(monthlyBudgetNum),
           requireFamilyForNewRecipient: Boolean(requireFamilyForNewRecipient),
           requireFamilyForUnusual: Boolean(requireFamilyForUnusual),
           version: { increment: 1 },
