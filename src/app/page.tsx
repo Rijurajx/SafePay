@@ -16,6 +16,12 @@ import {
   ShoppingBag,
   Sparkles,
   RefreshCw,
+  Sun,
+  Moon,
+  Mic,
+  Send,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -24,6 +30,12 @@ export default function HomePage() {
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'verifying' | 'completed'>('idle');
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [recentAction, setRecentAction] = useState<string | null>(null);
+
+  // Preview interactive state
+  const [previewDark, setPreviewDark] = useState(false);
+  const [isDeviceSidebarCollapsed, setIsDeviceSidebarCollapsed] = useState(false);
+  const [previewChatInput, setPreviewChatInput] = useState('');
+  const [voiceActive, setVoiceActive] = useState(false);
 
   // Mascot eye-tracking refs
   const heroMascotRef = useRef<HTMLDivElement>(null);
@@ -182,25 +194,39 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* INTERACTIVE MACBOOK MOCKUP (Senior Experience & Guardian Panel Toggle) */}
+      {/* INTERACTIVE MOCKUP (Senior Experience & Guardian Panel Toggle) */}
       <section id="preview" className="px-4 sm:px-6 pb-24 max-w-6xl mx-auto">
-        <div className="w-full liquid-glass rounded-3xl sm:rounded-[2.25rem] overflow-hidden border border-white/80 shadow-[0_24px_64px_-16px_rgba(15,23,42,0.12)]">
-          {/* macOS Chrome Header with Traffic Light Dots */}
-          <div className="h-12 px-5 flex items-center justify-between border-b border-black/5 bg-white/40 backdrop-blur-md">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-[#ff5f57] border border-black/10" />
-              <div className="w-3 h-3 rounded-full bg-[#febc2e] border border-black/10" />
-              <div className="w-3 h-3 rounded-full bg-[#28c840] border border-black/10" />
-            </div>
-
-            {/* Apple Liquid Glass Segmented Switcher */}
+        <div
+          className={`w-full rounded-3xl sm:rounded-[2.25rem] overflow-hidden border transition-all duration-300 shadow-[0_24px_64px_-16px_rgba(15,23,42,0.12)] ${
+            previewDark
+              ? 'bg-slate-900/90 border-slate-800 text-white shadow-2xl'
+              : 'liquid-glass border-white/80 text-slate-900'
+          }`}
+        >
+          {/* Header Bar (No 3 dots, No macOS Sequoia, Dark/Light Mode Toggle) */}
+          <div
+            className={`h-12 px-5 flex items-center justify-between border-b transition-colors duration-200 ${
+              previewDark
+                ? 'bg-slate-900/90 border-white/10 text-white'
+                : 'bg-white/40 border-black/5 text-slate-900'
+            } backdrop-blur-md`}
+          >
+            {/* Apple Liquid Glass Segmented Switcher (Preserved in Homepage Preview) */}
             <div className="flex items-center gap-3">
-              <div className="flex bg-black/[0.04] p-1 rounded-full border border-black/5 text-xs font-semibold">
+              <div
+                className={`flex p-1 rounded-full border text-xs font-semibold ${
+                  previewDark ? 'bg-white/10 border-white/10' : 'bg-black/[0.04] border-black/5'
+                }`}
+              >
                 <button
                   onClick={() => setActiveTab('senior')}
                   className={`px-4 py-1 rounded-full transition-all duration-200 ${
                     activeTab === 'senior'
-                      ? 'bg-white text-slate-950 shadow-xs'
+                      ? previewDark
+                        ? 'bg-slate-800 text-white shadow-xs'
+                        : 'bg-white text-slate-950 shadow-xs'
+                      : previewDark
+                      ? 'text-slate-400 hover:text-white'
                       : 'text-slate-600 hover:text-slate-950'
                   }`}
                 >
@@ -210,7 +236,11 @@ export default function HomePage() {
                   onClick={() => setActiveTab('guardian')}
                   className={`px-4 py-1 rounded-full transition-all duration-200 ${
                     activeTab === 'guardian'
-                      ? 'bg-white text-slate-950 shadow-xs'
+                      ? previewDark
+                        ? 'bg-slate-800 text-white shadow-xs'
+                        : 'bg-white text-slate-950 shadow-xs'
+                      : previewDark
+                      ? 'text-slate-400 hover:text-white'
                       : 'text-slate-600 hover:text-slate-950'
                   }`}
                 >
@@ -219,88 +249,175 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="w-12 text-right hidden sm:block">
-              <span className="text-[11px] font-mono font-bold text-slate-400">macOS Sequoia</span>
+            {/* Dark / Light Mode Toggle Button */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPreviewDark((prev) => !prev)}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-all active:scale-95 ${
+                  previewDark
+                    ? 'bg-slate-800 border-slate-700 text-amber-300 hover:bg-slate-700 shadow-xs'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-2xs'
+                }`}
+                title={previewDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+              >
+                {previewDark ? (
+                  <>
+                    <Sun className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="text-[11px]">Light Mode</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon className="w-3.5 h-3.5 text-slate-600" />
+                    <span className="text-[11px]">Dark Mode</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
-          {/* Macbook Body Container */}
-          <div className="flex flex-col md:flex-row h-auto md:h-[580px] bg-white/70 text-slate-900">
-            {/* Left Device Selection Aside */}
-            <aside className="w-full md:w-72 border-r border-black/5 bg-slate-50/60 p-4 flex flex-col shrink-0">
-              <div className="relative mb-3">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search family devices..."
-                  className="w-full h-9 pl-9 pr-4 rounded-xl bg-white border border-black/5 text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500/20 text-slate-900 placeholder:text-slate-400"
-                />
+          {/* Body Container */}
+          <div
+            className={`flex flex-col md:flex-row h-auto md:h-[580px] transition-colors duration-200 ${
+              previewDark ? 'bg-slate-950 text-slate-100' : 'bg-white/70 text-slate-900'
+            }`}
+          >
+            {/* Left Device Selection Aside (Collapsible) */}
+            <aside
+              className={`border-r transition-[width,padding] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col shrink-0 ${
+                previewDark ? 'bg-slate-900/60 border-white/10' : 'bg-slate-50/60 border-black/5'
+              } ${isDeviceSidebarCollapsed ? 'w-16 p-2 items-center' : 'w-full md:w-72 p-4'}`}
+            >
+              <div className="flex items-center justify-between mb-3 w-full">
+                {!isDeviceSidebarCollapsed && (
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wider ${
+                      previewDark ? 'text-slate-400' : 'text-slate-500'
+                    }`}
+                  >
+                    Family Devices
+                  </span>
+                )}
+                <button
+                  onClick={() => setIsDeviceSidebarCollapsed((prev) => !prev)}
+                  className={`p-1.5 rounded-xl transition-colors ${
+                    previewDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-black/5 text-slate-500'
+                  }`}
+                  title={isDeviceSidebarCollapsed ? 'Expand Devices' : 'Collapse Devices'}
+                >
+                  {isDeviceSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+                </button>
               </div>
 
-              <div className="space-y-1.5 flex-1 overflow-y-auto">
+              {!isDeviceSidebarCollapsed && (
+                <div className="relative mb-3 w-full">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search family devices..."
+                    className={`w-full h-9 pl-9 pr-4 rounded-xl border text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500/20 ${
+                      previewDark
+                        ? 'bg-slate-800 border-white/10 text-white placeholder:text-slate-500'
+                        : 'bg-white border-black/5 text-slate-900 placeholder:text-slate-400'
+                    }`}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1.5 flex-1 overflow-y-auto w-full">
                 <div
                   onClick={() => setActiveTab('senior')}
                   className={`p-3 rounded-2xl flex items-center gap-3 cursor-pointer transition-all ${
                     activeTab === 'senior'
-                      ? 'bg-white shadow-xs border border-black/5'
+                      ? previewDark
+                        ? 'bg-slate-800 shadow-xs border border-white/10'
+                        : 'bg-white shadow-xs border border-black/5'
+                      : previewDark
+                      ? 'hover:bg-white/5'
                       : 'hover:bg-black/[0.03]'
                   }`}
+                  title="Mr. Thomas's iPad"
                 >
                   <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-xs">
                     T
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-baseline">
-                      <h4 className="text-xs font-bold truncate text-slate-900">Mr. Thomas&apos;s iPad</h4>
-                      <span className="text-[10px] text-slate-400">12:44 PM</span>
+                  {!isDeviceSidebarCollapsed && (
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-baseline">
+                        <h4 className={`text-xs font-bold truncate ${previewDark ? 'text-white' : 'text-slate-900'}`}>
+                          Mr. Thomas&apos;s iPad
+                        </h4>
+                        <span className="text-[10px] text-slate-400">12:44 PM</span>
+                      </div>
+                      <p className="text-[11px] text-emerald-500 font-medium truncate flex items-center gap-1 mt-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                        Active on Amazon.com
+                      </p>
                     </div>
-                    <p className="text-[11px] text-emerald-600 font-medium truncate flex items-center gap-1 mt-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-                      Active on Amazon.com
-                    </p>
-                  </div>
+                  )}
                 </div>
 
                 <div
                   onClick={() => setActiveTab('guardian')}
                   className={`p-3 rounded-2xl flex items-center gap-3 cursor-pointer transition-all ${
                     activeTab === 'guardian'
-                      ? 'bg-white shadow-xs border border-black/5'
+                      ? previewDark
+                        ? 'bg-slate-800 shadow-xs border border-white/10'
+                        : 'bg-white shadow-xs border border-black/5'
+                      : previewDark
+                      ? 'hover:bg-white/5'
                       : 'hover:bg-black/[0.03]'
                   }`}
+                  title="Maya's MacBook"
                 >
                   <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-xs">
                     M
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-baseline">
-                      <h4 className="text-xs font-bold truncate text-slate-900">Maya&apos;s MacBook</h4>
-                      <span className="text-[10px] text-slate-400">Yesterday</span>
+                  {!isDeviceSidebarCollapsed && (
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-baseline">
+                        <h4 className={`text-xs font-bold truncate ${previewDark ? 'text-white' : 'text-slate-900'}`}>
+                          Maya&apos;s MacBook
+                        </h4>
+                        <span className="text-[10px] text-slate-400">Yesterday</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 truncate mt-0.5">1 pending review request</p>
                     </div>
-                    <p className="text-[11px] text-slate-500 truncate mt-0.5">1 pending review request</p>
-                  </div>
+                  )}
                 </div>
               </div>
 
-              {/* Status footer inside aside */}
-              <div className="pt-3 border-t border-black/5 flex items-center justify-between text-[11px] text-slate-400">
-                <span>SafePay Network</span>
-                <span className="text-emerald-600 font-semibold">Protected</span>
-              </div>
+              {!isDeviceSidebarCollapsed && (
+                <div
+                  className={`pt-3 border-t flex items-center justify-between text-[11px] ${
+                    previewDark ? 'border-white/10 text-slate-400' : 'border-black/5 text-slate-400'
+                  }`}
+                >
+                  <span>SafePay Network</span>
+                  <span className="text-emerald-500 font-semibold">Protected</span>
+                </div>
+              )}
             </aside>
 
             {/* Main Stage Display */}
-            <main className="flex-1 flex flex-col justify-between overflow-hidden bg-white/40">
+            <main
+              className={`flex-1 flex flex-col justify-between overflow-hidden transition-colors ${
+                previewDark ? 'bg-slate-950/80 text-white' : 'bg-white/40 text-slate-900'
+              }`}
+            >
               {activeTab === 'senior' ? (
                 /* SCREEN 1: SENIOR EXPERIENCE */
                 <div className="flex-1 flex flex-col justify-between h-full">
                   <div className="p-6 md:p-8 flex-1 overflow-y-auto space-y-6">
-                    {/* Assistant Message Bubble */}
-                    <div className="flex items-start gap-3.5 max-w-lg">
+                    {/* Assistant Message Bubble with smooth fluid transition */}
+                    <div className="flex items-start gap-3.5 max-w-lg animate-in fade-in slide-in-from-bottom-2 duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]">
                       <div
                         id="chat-mascot"
                         className={`w-9 h-9 rounded-full relative shrink-0 transition-all duration-300 flex items-center justify-center shadow-xs ${
-                          paymentStatus === 'completed' ? 'bg-emerald-600 scale-105' : 'bg-slate-950'
+                          paymentStatus === 'completed'
+                            ? 'bg-emerald-600 scale-105'
+                            : previewDark
+                            ? 'bg-purple-600'
+                            : 'bg-slate-950'
                         }`}
                       >
                         <div className="flex items-center justify-center gap-1">
@@ -308,8 +425,14 @@ export default function HomePage() {
                           <div className="w-1 h-2 bg-white rounded-full" />
                         </div>
                       </div>
-                      <div className="bg-white border border-black/5 rounded-2xl p-4 shadow-xs">
-                        <p className="text-xs sm:text-sm text-slate-800 leading-relaxed">
+                      <div
+                        className={`border rounded-2xl p-4 shadow-xs transition-colors ${
+                          previewDark
+                            ? 'bg-slate-900 border-white/10 text-slate-200'
+                            : 'bg-white border-black/5 text-slate-800'
+                        }`}
+                      >
+                        <p className="text-xs sm:text-sm leading-relaxed">
                           Hi Thomas! I noticed you&apos;re looking at a gardening tool set on Amazon. It&apos;s listed
                           for $45.99. Would you like me to help you pay for this safely?
                         </p>
@@ -317,21 +440,41 @@ export default function HomePage() {
                     </div>
 
                     {/* Verified Connection Box with Apple Liquid Card */}
-                    <div className="ml-0 md:ml-12 liquid-glass rounded-2xl p-6 sm:p-8 flex flex-col items-center justify-center text-center gap-3.5 border border-white/90 shadow-sm max-w-md">
+                    <div
+                      className={`ml-0 md:ml-12 rounded-2xl p-6 sm:p-8 flex flex-col items-center justify-center text-center gap-3.5 border shadow-sm max-w-md transition-colors ${
+                        previewDark
+                          ? 'bg-slate-900/90 border-white/10 text-white'
+                          : 'liquid-glass border-white/90 text-slate-900'
+                      }`}
+                    >
                       <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center">
                         <CheckCircle2 className="w-8 h-8 text-emerald-600" />
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        <p
+                          className={`text-xs font-semibold uppercase tracking-wider ${
+                            previewDark ? 'text-slate-400' : 'text-slate-400'
+                          }`}
+                        >
                           Verified Secure Connection
                         </p>
-                        <h3 className="text-3xl font-extrabold text-slate-950 mt-1">$45.99</h3>
+                        <h3
+                          className={`text-3xl font-extrabold mt-1 ${
+                            previewDark ? 'text-white' : 'text-slate-950'
+                          }`}
+                        >
+                          $45.99
+                        </h3>
                       </div>
 
                       {paymentStatus === 'idle' && (
                         <button
                           onClick={handlePayment}
-                          className="w-full max-w-xs py-3 rounded-full bg-slate-950 text-white font-semibold text-sm shadow-sm hover:bg-slate-800 active:scale-[0.98] transition-all"
+                          className={`w-full max-w-xs py-3 rounded-full font-semibold text-sm shadow-sm active:scale-[0.98] transition-all ${
+                            previewDark
+                              ? 'bg-white text-slate-950 hover:bg-slate-100'
+                              : 'bg-slate-950 text-white hover:bg-slate-800'
+                          }`}
                         >
                           Confirm Payment
                         </button>
@@ -352,35 +495,68 @@ export default function HomePage() {
                           <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-xs">
                             <span className="w-1.5 h-1.5 bg-white rounded-full" /> DONE
                           </span>
-                          <p className="text-xs font-semibold text-emerald-700">
-                            Payment sent & verified by your daughter Maya.
+                          <p className="text-xs font-semibold text-emerald-500">
+                            Payment sent &amp; verified by your daughter Maya.
                           </p>
                         </div>
                       )}
 
-                      <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                      <p
+                        className={`text-[10px] uppercase tracking-widest font-bold ${
+                          previewDark ? 'text-slate-500' : 'text-slate-400'
+                        }`}
+                      >
                         Secured by Family Member Oversight
                       </p>
                     </div>
                   </div>
 
-                  {/* Context Bar at Bottom */}
-                  <div className="p-4 border-t border-black/5 bg-white/70 backdrop-blur-md">
-                    <div className="flex items-center gap-3 bg-slate-50 rounded-full px-5 py-2.5 border border-black/5">
-                      <span className="text-xs text-slate-500">Ask me anything about this payment...</span>
-                      <div className="ml-auto flex gap-1 items-center">
-                        <div className="w-1.5 h-1.5 bg-orange-500 rounded-full orange-pulse" />
-                        <div
-                          className="w-1.5 h-1.5 bg-orange-500 rounded-full orange-pulse"
-                          style={{ animationDelay: '0.2s' }}
-                        />
-                        <div
-                          className="w-1.5 h-1.5 bg-orange-500 rounded-full orange-pulse"
-                          style={{ animationDelay: '0.4s' }}
-                        />
-                        <span className="text-[10px] font-bold text-orange-600 ml-1.5">RECEIVING CONTEXT</span>
-                      </div>
-                    </div>
+                  {/* Input Bar at Bottom (Only Send and Voice buttons, No receiving context) */}
+                  <div
+                    className={`p-4 border-t backdrop-blur-md transition-colors ${
+                      previewDark ? 'bg-slate-900/80 border-white/10' : 'bg-white/70 border-black/5'
+                    }`}
+                  >
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        setPreviewChatInput('');
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <input
+                        type="text"
+                        value={previewChatInput}
+                        onChange={(e) => setPreviewChatInput(e.target.value)}
+                        placeholder="Ask me anything about this payment..."
+                        className={`flex-1 px-4 py-2.5 rounded-full border text-xs outline-none transition-all ${
+                          previewDark
+                            ? 'bg-slate-800 border-white/10 text-white placeholder:text-slate-500 focus:border-purple-500'
+                            : 'bg-slate-50 border-black/5 text-slate-900 placeholder:text-slate-500 focus:border-purple-600'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setVoiceActive((prev) => !prev)}
+                        className={`p-2.5 rounded-full border transition-all ${
+                          voiceActive
+                            ? 'bg-rose-500 text-white border-rose-600 animate-pulse'
+                            : previewDark
+                            ? 'bg-slate-800 text-slate-300 border-white/10 hover:bg-slate-700'
+                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                        }`}
+                        title={voiceActive ? 'Listening Active' : 'Start Voice Input'}
+                      >
+                        <Mic className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="submit"
+                        className="p-2.5 rounded-full bg-slate-950 text-white hover:bg-slate-800 transition-all shadow-xs shrink-0 active:scale-95"
+                        title="Send Message"
+                      >
+                        <Send className="w-4 h-4 text-purple-400" />
+                      </button>
+                    </form>
                   </div>
                 </div>
               ) : (
@@ -388,8 +564,16 @@ export default function HomePage() {
                 <div className="flex-1 flex flex-col p-6 sm:p-8 space-y-6 overflow-y-auto">
                   <div className="flex justify-between items-center">
                     <div>
-                      <h2 className="text-lg font-bold text-slate-950">Oversight Dashboard</h2>
-                      <p className="text-xs text-slate-500">Monitoring Mr. Thomas&apos;s activity</p>
+                      <h2
+                        className={`text-lg font-bold ${
+                          previewDark ? 'text-white' : 'text-slate-950'
+                        }`}
+                      >
+                        Oversight Dashboard
+                      </h2>
+                      <p className={`text-xs ${previewDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Monitoring Mr. Thomas&apos;s activity
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="h-6 px-3 bg-emerald-100 text-emerald-800 rounded-full text-[11px] font-bold flex items-center gap-1">
@@ -397,52 +581,102 @@ export default function HomePage() {
                       </span>
                       <Link
                         href="/dashboard"
-                        className="w-8 h-8 rounded-full bg-black/5 hover:bg-black/10 flex items-center justify-center transition-colors"
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                          previewDark ? 'bg-white/10 hover:bg-white/20' : 'bg-black/5 hover:bg-black/10'
+                        }`}
                         title="Family Protection Settings"
                       >
-                        <Settings className="w-4 h-4 text-slate-600" />
+                        <Settings className={`w-4 h-4 ${previewDark ? 'text-slate-300' : 'text-slate-600'}`} />
                       </Link>
                     </div>
                   </div>
 
                   {/* Stat Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="liquid-glass p-5 rounded-2xl border border-white/80">
-                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Today&apos;s Spend</p>
-                      <p className="text-2xl font-extrabold text-slate-950">$112.40</p>
-                      <div className="mt-3.5 h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                    <div
+                      className={`p-5 rounded-2xl border transition-colors ${
+                        previewDark
+                          ? 'bg-slate-900 border-white/10 text-white'
+                          : 'liquid-glass border-white/80'
+                      }`}
+                    >
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Today&apos;s Spend
+                      </p>
+                      <p
+                        className={`text-2xl font-extrabold ${
+                          previewDark ? 'text-white' : 'text-slate-950'
+                        }`}
+                      >
+                        $112.40
+                      </p>
+                      <div className="mt-3.5 h-1.5 w-full bg-slate-200/40 rounded-full overflow-hidden">
                         <div className="h-full bg-purple-600 w-2/3 rounded-full" />
                       </div>
                     </div>
-                    <div className="liquid-glass p-5 rounded-2xl border border-white/80">
-                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Protection Cap</p>
-                      <p className="text-2xl font-extrabold text-slate-950">$2,500.00</p>
-                      <p className="text-xs text-emerald-600 font-semibold mt-2">Zero anomalous spikes detected</p>
+                    <div
+                      className={`p-5 rounded-2xl border transition-colors ${
+                        previewDark
+                          ? 'bg-slate-900 border-white/10 text-white'
+                          : 'liquid-glass border-white/80'
+                      }`}
+                    >
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Protection Cap
+                      </p>
+                      <p
+                        className={`text-2xl font-extrabold ${
+                          previewDark ? 'text-white' : 'text-slate-950'
+                        }`}
+                      >
+                        $2,500.00
+                      </p>
+                      <p className="text-xs text-emerald-500 font-semibold mt-2">Zero anomalous spikes detected</p>
                     </div>
                   </div>
 
                   {/* Recent Verification Request */}
-                  <div className="liquid-glass rounded-2xl p-5 border border-white/80 space-y-3">
+                  <div
+                    className={`rounded-2xl p-5 border space-y-3 transition-colors ${
+                      previewDark
+                        ? 'bg-slate-900 border-white/10 text-white'
+                        : 'liquid-glass border-white/80'
+                    }`}
+                  >
                     <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      <h3
+                        className={`text-xs font-bold uppercase tracking-wider ${
+                          previewDark ? 'text-white' : 'text-slate-900'
+                        }`}
+                      >
                         Recent Verification Request
                       </h3>
                       <Link
                         href="/dashboard"
-                        className="text-xs font-semibold text-purple-600 hover:text-purple-700"
+                        className="text-xs font-semibold text-purple-400 hover:text-purple-300"
                       >
                         View in Dashboard &rarr;
                       </Link>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-white/60 rounded-xl border border-black/5 gap-3">
+                    <div
+                      className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border gap-3 ${
+                        previewDark
+                          ? 'bg-slate-800/80 border-white/10'
+                          : 'bg-white/60 border-black/5'
+                      }`}
+                    >
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
                           <ShoppingCart className="w-4 h-4" />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-slate-900">Amazon.com</p>
-                          <p className="text-[11px] text-slate-500">Gardening Kit • $45.99</p>
+                          <p className={`text-xs font-bold ${previewDark ? 'text-white' : 'text-slate-900'}`}>
+                            Amazon.com
+                          </p>
+                          <p className={`text-[11px] ${previewDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Gardening Kit • $45.99
+                          </p>
                         </div>
                       </div>
 

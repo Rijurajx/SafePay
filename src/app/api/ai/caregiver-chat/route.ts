@@ -334,11 +334,13 @@ ${JSON.stringify(ragContext, null, 2)}
 CORE PHILOSOPHY & BEHAVIOR:
 1. "Rules decide. AI explains. People remain in control."
 2. You provide factual, objective risk analysis, spending summaries, and empathetic communication advice.
-3. You CANNOT approve or decline payments yourself. Remind the caregiver that approval buttons are on their dashboard workbench.
-4. If asked about a pending hold, state the exact merchant name, exact dollar amount, risk score, and policy violation factual details.
-5. If asked to draft a message or SMS to ${elderFullName}, write a warm, respectful check-in that preserves dignity and never blames. Enclose the message in [SMS_DRAFT] ... [/SMS_DRAFT].
-6. Keep responses clear and formatted in GitHub-flavored Markdown.
-7. Always append 2-3 dynamic, relevant suggestions at the very end in [SUGGESTIONS] question 1 | question 2 | question 3 [/SUGGESTIONS].
+3. NEVER introduce yourself or say "Hello, I am your SafePay AI Assistant" repeatedly. Jump straight into the helpful, humane response without robotic preambles.
+4. Keep your tone humane, dignified, and natural. Speak like a caring and attentive financial safety advisor.
+5. You CANNOT approve or decline payments yourself. Remind the caregiver that approval controls are located directly above the chat.
+6. If asked about a pending hold, state the exact merchant name, exact dollar amount, risk score, and policy violation factual details.
+7. If asked to draft a message or SMS to ${elderFullName}, write a warm, respectful check-in that preserves dignity and never blames. Enclose the message in [SMS_DRAFT] ... [/SMS_DRAFT].
+8. Format cleanly with clear sentences and bullet points.
+9. Always append 2-3 dynamic, relevant suggestions at the very end in [SUGGESTIONS] question 1 | question 2 | question 3 [/SUGGESTIONS].
 `;
 
     const apiKey = process.env.GEMINI_API_KEY;
@@ -537,12 +539,11 @@ ${latestHold ? `Explain the pending $${latestHold.amount.toFixed(0)} charge | Dr
           ? `• **1 pending hold requires your review:** **${latestHold.merchantName} ($${latestHold.amount.toFixed(2)})**.\n• Everyday purchases under ${approvalThreshold} continue to process smoothly without delay.`
           : `• All accounts are clear. There are currently **0 pending holds**.\n• Everyday purchases under ${approvalThreshold} continue to process smoothly.`;
 
-        replyText = `Hello ${session.fullName}. I'm your **SafePay AI Assistant** for ${elderFullName}.
+        replyText = `Here is the current account status for ${elderFullName}:
 
-I'm monitoring ${elderFullName}'s account activity in real time. Currently:
 ${holdSummary}
 
-How can I help you today? You can choose from the suggested prompts below or ask me any question.
+What would you like to review or do? You can select any question below or ask me directly.
 
 [SUGGESTIONS]
 ${latestHold ? `Why was the $${latestHold.amount.toFixed(0)} charge held? | Draft a gentle text to ${elderFirstName} | Summarize ${elderFirstName}'s spending history` : `Summarize ${elderFirstName}'s spending | Who are ${elderFirstName}'s saved merchants? | Review protection limits`}

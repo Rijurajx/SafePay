@@ -33,6 +33,9 @@ import {
   Search,
   Send,
   ArrowRight,
+  Sun,
+  Moon,
+  Mic,
 } from 'lucide-react';
 import { SessionUser, DemoPersonaKey } from '@/types';
 import { createClient } from '@/lib/supabase/client';
@@ -145,6 +148,85 @@ interface SeniorGuardian {
   canApprove: boolean;
 }
 
+function renderInline(text: string) {
+  const parts: (string | React.ReactNode)[] = [];
+  const regex = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const token = match[0];
+    if (token.startsWith('**') && token.endsWith('**')) {
+      parts.push(
+        <strong key={`b-${match.index}`} className="font-semibold text-inherit">
+          {token.slice(2, -2)}
+        </strong>
+      );
+    } else if (token.startsWith('*') && token.endsWith('*')) {
+      parts.push(
+        <em key={`i-${match.index}`} className="italic text-inherit">
+          {token.slice(1, -1)}
+        </em>
+      );
+    }
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts;
+}
+
+function FormattedMessage({ content, isDark }: { content: string; isDark?: boolean }) {
+  const lines = content.split('\n');
+  return (
+    <div className="space-y-1.5 leading-relaxed text-xs">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <div key={idx} className="h-1" />;
+
+        if (trimmed.startsWith('### ')) {
+          return (
+            <h4
+              key={idx}
+              className={`font-bold text-xs pt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}
+            >
+              {renderInline(trimmed.replace(/^###\s+/, ''))}
+            </h4>
+          );
+        }
+
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ')) {
+          const itemText = trimmed.replace(/^[-*•]\s+/, '');
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-1">
+              <span
+                className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${
+                  isDark ? 'bg-purple-400' : 'bg-purple-600'
+                }`}
+              />
+              <span className={isDark ? 'text-slate-200' : 'text-slate-700'}>
+                {renderInline(itemText)}
+              </span>
+            </div>
+          );
+        }
+
+        return (
+          <p key={idx} className={isDark ? 'text-slate-200' : 'text-slate-700'}>
+            {renderInline(trimmed)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
@@ -153,6 +235,10 @@ export default function DashboardPage() {
   // Navigation & Layout State
   const [activeTab, setActiveTab] = useState<'overview' | 'elders' | 'ai-chat' | 'profile'>('overview');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [chatDark, setChatDark] = useState(false);
+  const [isElderChatSidebarCollapsed, setIsElderChatSidebarCollapsed] = useState(false);
+  const [voiceActive, setVoiceActive] = useState(false);
+  const [elderSearchQuery, setElderSearchQuery] = useState('');
 
   // Caregiver core state
   const [linkedElders, setLinkedElders] = useState<LinkedElder[]>([]);
@@ -321,7 +407,7 @@ export default function DashboardPage() {
         return {
           id: `welcome-${elder.id}-${hold.id}`,
           role: 'assistant',
-          content: `Hello ${currentUser?.fullName || 'Caregiver'}! I am monitoring **${elder.fullName}**'s account in real time.\n\n⚠️ **Action Required:** SafePay held a **$${hold.amount.toFixed(2)} ${hold.currency}** charge from **${hold.merchantName}** (${hold.category}, AI Risk Score: ${hold.riskScore}/100).\n\nYou can authorize or decline using the control buttons above, or ask me why this charge was flagged.`,
+          content: `SafePay held a **$${hold.amount.toFixed(2)} ${hold.currency}** payment to **${hold.merchantName}** for ${elder.fullName}.\n\nThis charge was flagged with an AI risk score of **${hold.riskScore}/100**. You can approve or decline this payment directly above, or ask me to inspect the merchant details and history.`,
           suggestedActions: [
             `Why was the $${hold.amount.toFixed(0)} charge from ${hold.merchantName} held?`,
             `Draft a gentle text to ${elder.fullName} about this charge`,
@@ -334,7 +420,7 @@ export default function DashboardPage() {
       return {
         id: `welcome-${elder.id}`,
         role: 'assistant',
-        content: `Hello ${currentUser?.fullName || 'Caregiver'}! I am your AI Assistant for **${elder.fullName}**.\n\nAll safeguards are active (Auto-Approval: $${elder.protectionSettings.familyApprovalThreshold}, Daily Cap: $${elder.protectionSettings.absoluteDailyCap}, Monthly Budget: $${(elder.protectionSettings.monthlyBudget || 2000).toLocaleString()}). No pending holds require your attention right now.\n\nAsk me about recent transactions, spending patterns, or drafting check-in messages.`,
+        content: `Active protection is running smoothly for **${elder.fullName}**.\n\nAll safeguards are in place: Auto-approval is set to **$${elder.protectionSettings.familyApprovalThreshold}**, daily cap is **$${elder.protectionSettings.absoluteDailyCap}**, and monthly budget is **$${(elder.protectionSettings.monthlyBudget || 2000).toLocaleString()}**. No pending holds require action right now.\n\nFeel free to ask about recent spending patterns, merchant credibility, or drafting a check-in message.`,
         suggestedActions: [
           `Summarize ${elder.fullName}'s recent transactions`,
           `Are ${elder.fullName}'s safety limits appropriate?`,
@@ -343,7 +429,7 @@ export default function DashboardPage() {
         timestamp: time,
       };
     },
-    [currentUser?.fullName]
+    []
   );
 
   // Initialize elder chat context if empty
@@ -1786,253 +1872,462 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* TAB 3: DEDICATED AI ASSISTANT CHAT (SPLIT SCREEN WORKSPACE) */}
+        {/* TAB 3: DEDICATED AI ASSISTANT CHAT (HOMEPAGE-INSPIRED WINDOW FRAME) */}
         {activeTab === 'ai-chat' && (
-          <div className="flex-1 flex flex-col md:flex-row h-full min-h-[calc(100vh-65px)]">
-            {/* Left Elder Switcher Sidebar for AI Assistant */}
-            <div className="w-full md:w-72 border-b md:border-b-0 md:border-r border-slate-200/80 bg-white/60 backdrop-blur-sm p-4 space-y-3 shrink-0">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Select Family Member</h3>
-                <p className="text-[11px] text-slate-500">Each senior has their own AI context &amp; holds</p>
+          <div className="p-4 sm:p-6 max-w-7xl mx-auto w-full">
+            <div
+              className={`w-full rounded-3xl sm:rounded-[2rem] overflow-hidden border transition-all duration-300 shadow-[0_20px_50px_-15px_rgba(15,23,42,0.1)] ${
+                chatDark
+                  ? 'bg-slate-900/95 border-slate-800 text-white shadow-2xl'
+                  : 'bg-white/80 border-slate-200/80 text-slate-900 backdrop-blur-md'
+              }`}
+            >
+              {/* Header Bar: SafePay AI badge + Dark/Light toggle (No macOS 3 dots, No Sequoia, No Senior/Family view toggle) */}
+              <div
+                className={`h-14 px-5 flex items-center justify-between border-b transition-colors duration-200 ${
+                  chatDark
+                    ? 'bg-slate-900/90 border-white/10 text-white'
+                    : 'bg-white/60 border-black/5 text-slate-900'
+                } backdrop-blur-md`}
+              >
+                {/* Brand / Agent Context */}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-purple-600/10 border border-purple-500/20 text-purple-600 flex items-center justify-center font-bold">
+                    <Bot className="w-4 h-4 text-purple-600" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs tracking-tight">SafePay AI Assistant</span>
+                      <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live Guardian RAG
+                      </span>
+                    </div>
+                    {activeElder && (
+                      <p className={`text-[11px] ${chatDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Context active for: <strong className={chatDark ? 'text-white' : 'text-slate-900'}>{activeElder.fullName}</strong> ({activeElder.relationship})
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Dark / Light Mode Toggle Button */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setChatDark((prev) => !prev)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all text-xs font-medium ${
+                      chatDark
+                        ? 'bg-slate-800 border-white/10 text-slate-200 hover:bg-slate-700'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-2xs'
+                    }`}
+                    title={chatDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                  >
+                    {chatDark ? (
+                      <>
+                        <Sun className="w-3.5 h-3.5 text-amber-400" />
+                        <span className="text-[11px]">Light Mode</span>
+                      </>
+                    ) : (
+                      <>
+                        <Moon className="w-3.5 h-3.5 text-slate-600" />
+                        <span className="text-[11px]">Dark Mode</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-1.5">
-                {linkedElders.map((elder) => {
-                  const elderHolds = pendingApprovals.filter(
-                    (p) => p.elderName.toLowerCase() === elder.fullName.toLowerCase()
-                  );
-                  const isSelected = activeElder?.id === elder.id;
-                  return (
+              {/* Window Body: Collapsible Elder Sidebar + Main Chat Pane */}
+              <div
+                className={`flex flex-col md:flex-row h-[620px] transition-colors duration-200 ${
+                  chatDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50/50 text-slate-900'
+                }`}
+              >
+                {/* Left Elder Switcher Sidebar (Collapsible with smooth fluid transition) */}
+                <aside
+                  className={`border-r transition-[width,padding] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col shrink-0 ${
+                    chatDark ? 'bg-slate-900/60 border-white/10' : 'bg-white/70 border-black/5'
+                  } ${isElderChatSidebarCollapsed ? 'w-16 p-2 items-center' : 'w-full md:w-72 p-4'}`}
+                >
+                  <div className="flex items-center justify-between mb-3 w-full">
+                    {!isElderChatSidebarCollapsed && (
+                      <span
+                        className={`text-[10px] font-bold uppercase tracking-wider ${
+                          chatDark ? 'text-slate-400' : 'text-slate-500'
+                        }`}
+                      >
+                        Elder Accounts
+                      </span>
+                    )}
                     <button
-                      key={elder.id}
-                      onClick={() => setSelectedElderId(elder.id)}
-                      className={`w-full text-left p-3 rounded-2xl transition-all border ${
-                        isSelected
-                          ? 'bg-slate-950 text-white border-slate-950 shadow-sm'
-                          : 'bg-white hover:bg-slate-50 text-slate-900 border-slate-200/70'
+                      onClick={() => setIsElderChatSidebarCollapsed((prev) => !prev)}
+                      className={`p-1.5 rounded-xl transition-colors ${
+                        chatDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-black/5 text-slate-500'
+                      }`}
+                      title={isElderChatSidebarCollapsed ? 'Expand Elders' : 'Collapse Elders'}
+                    >
+                      {isElderChatSidebarCollapsed ? (
+                        <ChevronRight className="w-4 h-4" />
+                      ) : (
+                        <ChevronLeft className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+
+                  {!isElderChatSidebarCollapsed && (
+                    <div className="relative mb-3 w-full">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={elderSearchQuery}
+                        onChange={(e) => setElderSearchQuery(e.target.value)}
+                        placeholder="Search elder accounts..."
+                        className={`w-full h-9 pl-9 pr-3 rounded-xl border text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500/20 ${
+                          chatDark
+                            ? 'bg-slate-800 border-white/10 text-white placeholder:text-slate-500'
+                            : 'bg-white border-black/5 text-slate-900 placeholder:text-slate-400'
+                        }`}
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5 flex-1 overflow-y-auto w-full">
+                    {linkedElders
+                      .filter((elder) =>
+                        elder.fullName.toLowerCase().includes(elderSearchQuery.toLowerCase())
+                      )
+                      .map((elder) => {
+                        const elderHolds = pendingApprovals.filter(
+                          (p) => p.elderName.toLowerCase() === elder.fullName.toLowerCase()
+                        );
+                        const isSelected = activeElder?.id === elder.id;
+                        return (
+                          <button
+                            key={elder.id}
+                            onClick={() => setSelectedElderId(elder.id)}
+                            className={`w-full text-left p-2.5 rounded-2xl flex items-center gap-3 cursor-pointer transition-all border ${
+                              isSelected
+                                ? chatDark
+                                  ? 'bg-purple-600/20 border-purple-500/40 text-white shadow-xs'
+                                  : 'bg-purple-50 border-purple-200 text-purple-950 shadow-xs'
+                                : chatDark
+                                ? 'border-transparent hover:bg-white/5 text-slate-300'
+                                : 'border-transparent hover:bg-black/[0.03] text-slate-700'
+                            } ${isElderChatSidebarCollapsed ? 'justify-center p-2' : ''}`}
+                            title={`${elder.fullName} (${elder.relationship})`}
+                          >
+                            <div className="w-9 h-9 rounded-full bg-purple-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                              {elder.fullName.charAt(0)}
+                            </div>
+                            {!isElderChatSidebarCollapsed && (
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <h4
+                                    className={`text-xs font-bold truncate ${
+                                      isSelected
+                                        ? chatDark ? 'text-white' : 'text-purple-950'
+                                        : chatDark ? 'text-slate-200' : 'text-slate-900'
+                                    }`}
+                                  >
+                                    {elder.fullName}
+                                  </h4>
+                                  {elderHolds.length > 0 && (
+                                    <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 animate-pulse shrink-0">
+                                      {elderHolds.length} Hold
+                                    </span>
+                                  )}
+                                </div>
+                                <p
+                                  className={`text-[10px] truncate mt-0.5 ${
+                                    chatDark ? 'text-slate-400' : 'text-slate-500'
+                                  }`}
+                                >
+                                  {elder.relationship} • Cap ${elder.protectionSettings.absoluteDailyCap}
+                                </p>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                  </div>
+                </aside>
+
+                {/* Right Chat & Controls Main Pane */}
+                <main className="flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
+                  {/* Top Bar for active elder context & quick metrics */}
+                  {activeElder && (
+                    <div
+                      className={`p-3.5 border-b flex items-center justify-between transition-colors ${
+                        chatDark ? 'bg-slate-900/60 border-white/10' : 'bg-white/80 border-black/5'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs truncate">{elder.fullName}</span>
-                        {elderHolds.length > 0 && (
-                          <span
-                            className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                              isSelected ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-900'
-                            }`}
-                          >
-                            {elderHolds.length} Hold
-                          </span>
-                        )}
-                      </div>
-                      <div
-                        className={`text-[10px] mt-1 ${
-                          isSelected ? 'text-slate-300' : 'text-slate-500'
-                        }`}
-                      >
-                        {elder.relationship} • Cap: ${elder.protectionSettings.absoluteDailyCap}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Right Chat & Controls Main Pane */}
-            <div className="flex-1 flex flex-col bg-white/40 justify-between min-w-0">
-              {/* Active Elder Context Header */}
-              {activeElder && (
-                <div className="p-4 border-b border-slate-200/70 bg-white/70 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs">
-                      {activeElder.fullName.charAt(0)}
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-950">
-                        Monitoring: {activeElder.fullName} ({activeElder.relationship})
-                      </div>
-                      <div className="text-[10px] text-slate-500">
-                        Auto-Approval: ${activeElder.protectionSettings.familyApprovalThreshold} • Daily Cap: $
-                        {activeElder.protectionSettings.absoluteDailyCap} • Baseline: {activeElder.city || 'Local'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200">
-                    Live RAG Active
-                  </span>
-                </div>
-              )}
-
-              {/* High-Priority In-Chat Approvals & Controls Card */}
-              {activeElder && activeElderPendingApprovals.length > 0 && (
-                <div className="p-4 bg-amber-50/80 border-b border-amber-200 space-y-3">
-                  <div className="flex items-center justify-between text-xs font-bold text-amber-950">
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-4 h-4 text-amber-600 animate-spin" />
-                      <span>Pending Transaction Approval for {activeElder.fullName}</span>
-                    </div>
-                    <span className="text-[10px] bg-amber-200 px-2 py-0.5 rounded-full font-bold">
-                      Caregiver Decision Required
-                    </span>
-                  </div>
-
-                  {activeElderPendingApprovals.map((hold) => (
-                    <div
-                      key={hold.id}
-                      className="p-3.5 bg-white rounded-xl border border-amber-200/80 shadow-2xs space-y-2.5"
-                    >
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-purple-600/10 border border-purple-500/20 text-purple-600 flex items-center justify-center font-bold text-xs">
+                          {activeElder.fullName.charAt(0)}
+                        </div>
                         <div>
-                          <span className="font-bold text-xs text-slate-900">{hold.merchantName}</span>
-                          <span className="text-[11px] text-slate-500 block">{hold.category}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-base font-extrabold text-slate-950">
-                            ${hold.amount.toFixed(2)} {hold.currency}
-                          </span>
-                          <span className="text-[10px] font-bold text-rose-700 block">
-                            Risk Score: {hold.riskScore}/100
-                          </span>
+                          <div className={`text-xs font-bold ${chatDark ? 'text-white' : 'text-slate-950'}`}>
+                            Monitoring: {activeElder.fullName} ({activeElder.relationship})
+                          </div>
+                          <div className={`text-[10px] ${chatDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Auto-Approval: ${activeElder.protectionSettings.familyApprovalThreshold} • Daily Cap: ${activeElder.protectionSettings.absoluteDailyCap} • {activeElder.city || 'Local Area'}
+                          </div>
                         </div>
                       </div>
 
-                      {hold.explanation?.caregiverExplanation && (
-                        <p className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg leading-relaxed">
-                          {hold.explanation.caregiverExplanation}
-                        </p>
-                      )}
-
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          onClick={() => handleDecision(hold.id, 'APPROVED')}
-                          disabled={decidingId === hold.id}
-                          className="flex-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Approve Payment</span>
-                        </button>
-                        <button
-                          onClick={() => handleDecision(hold.id, 'DECLINED')}
-                          disabled={decidingId === hold.id}
-                          className="flex-1 py-1.5 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1"
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                          <span>Decline Payment</span>
-                        </button>
-                        <button
-                          onClick={() =>
-                            handleSendChatMessage(`Why was the $${hold.amount.toFixed(0)} charge from ${hold.merchantName} held?`)
-                          }
-                          className="py-1.5 px-3 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-900 text-xs font-semibold border border-purple-200 transition-all flex items-center gap-1"
-                        >
-                          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                          <span>Ask AI</span>
-                        </button>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-purple-600 bg-purple-500/10 px-2.5 py-1 rounded-full border border-purple-500/20">
+                          Deep Context RAG
+                        </span>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  )}
 
-              {/* Chat Message Stream */}
-              <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4">
-                {activeElder &&
-                  (chatMessagesByElder[activeElder.id] || []).map((msg) => (
+                  {/* High-Priority In-Chat Approvals & Controls Card */}
+                  {activeElder && activeElderPendingApprovals.length > 0 && (
                     <div
-                      key={msg.id}
-                      className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
+                      className={`p-3.5 border-b space-y-2.5 transition-colors ${
+                        chatDark
+                          ? 'bg-amber-950/30 border-amber-500/20 text-amber-200'
+                          : 'bg-amber-50/80 border-amber-200 text-amber-950'
+                      }`}
                     >
-                      <div
-                        className={`max-w-xl p-4 rounded-2xl text-xs leading-relaxed ${
-                          msg.role === 'user'
-                            ? 'bg-slate-950 text-white shadow-xs rounded-br-xs'
-                            : 'bg-white border border-slate-200/80 text-slate-800 shadow-2xs rounded-bl-xs'
-                        }`}
-                      >
-                        <div className="whitespace-pre-line">{msg.content}</div>
+                      <div className="flex items-center justify-between text-xs font-bold">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-4 h-4 text-amber-500 animate-spin" />
+                          <span>Pending Approval Request for {activeElder.fullName}</span>
+                        </div>
+                        <span className="text-[10px] bg-amber-400/20 text-amber-500 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+                          Caregiver Action Required
+                        </span>
+                      </div>
 
-                        {/* Draft SMS check-in box */}
-                        {msg.draftMessage && (
-                          <div className="mt-3 p-3 rounded-xl bg-purple-50 border border-purple-200/70 text-purple-950 space-y-2">
-                            <div className="flex items-center justify-between text-[11px] font-bold text-purple-900">
-                              <span>Draft Check-In Message:</span>
-                              <button
-                                onClick={() => handleCopyDraft(msg.draftMessage!, msg.id)}
-                                className="flex items-center gap-1 text-purple-700 hover:text-purple-950 transition-colors"
-                              >
-                                {copiedDraftId === msg.id ? (
-                                  <>
-                                    <Check className="w-3 h-3 text-emerald-600" />
-                                    <span>Copied!</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy className="w-3 h-3" />
-                                    <span>Copy SMS</span>
-                                  </>
-                                )}
-                              </button>
+                      {activeElderPendingApprovals.map((hold) => (
+                        <div
+                          key={hold.id}
+                          className={`p-3 rounded-2xl border transition-colors shadow-2xs space-y-2 ${
+                            chatDark
+                              ? 'bg-slate-900/90 border-white/10 text-white'
+                              : 'bg-white border-amber-200/80 text-slate-900'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="font-bold text-xs">{hold.merchantName}</span>
+                              <span className={`text-[11px] block ${chatDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                {hold.category}
+                              </span>
                             </div>
-                            <div className="font-mono text-[11px] bg-white p-2 rounded-lg border border-purple-200/40 text-slate-800">
-                              &ldquo;{msg.draftMessage}&rdquo;
+                            <div className="text-right">
+                              <span className="text-sm font-extrabold">
+                                ${hold.amount.toFixed(2)} {hold.currency}
+                              </span>
+                              <span className="text-[10px] font-bold text-rose-500 block">
+                                Risk Score: {hold.riskScore}/100
+                              </span>
                             </div>
                           </div>
-                        )}
-                      </div>
 
-                      <span className="text-[10px] text-slate-400 mt-1 px-1">{msg.timestamp}</span>
-
-                      {/* Suggested quick reply chips */}
-                      {msg.role === 'assistant' && msg.suggestedActions && msg.suggestedActions.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-2 max-w-xl">
-                          {msg.suggestedActions.map((action, i) => (
-                            <button
-                              key={i}
-                              onClick={() => handleSendChatMessage(action)}
-                              className="text-[11px] font-semibold text-purple-700 bg-white hover:bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200/70 transition-all shadow-2xs text-left"
+                          {hold.explanation?.caregiverExplanation && (
+                            <p
+                              className={`text-[11px] p-2 rounded-xl leading-relaxed ${
+                                chatDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-50 text-slate-600'
+                              }`}
                             >
-                              {action}
+                              {hold.explanation.caregiverExplanation}
+                            </p>
+                          )}
+
+                          <div className="flex items-center gap-2 pt-0.5">
+                            <button
+                              onClick={() => handleDecision(hold.id, 'APPROVED')}
+                              disabled={decidingId === hold.id}
+                              className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 active:scale-[0.98]"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Approve Payment</span>
                             </button>
-                          ))}
+                            <button
+                              onClick={() => handleDecision(hold.id, 'DECLINED')}
+                              disabled={decidingId === hold.id}
+                              className="flex-1 py-1.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 active:scale-[0.98]"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              <span>Decline Payment</span>
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleSendChatMessage(`Why was the $${hold.amount.toFixed(0)} charge from ${hold.merchantName} held?`)
+                              }
+                              className={`py-1.5 px-3 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1 active:scale-[0.98] ${
+                                chatDark
+                                  ? 'bg-purple-900/30 text-purple-300 border-purple-500/30 hover:bg-purple-900/50'
+                                  : 'bg-purple-50 text-purple-900 border-purple-200 hover:bg-purple-100'
+                              }`}
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                              <span>Ask AI</span>
+                            </button>
+                          </div>
                         </div>
-                      )}
+                      ))}
                     </div>
-                  ))}
+                  )}
 
-                {chatLoading && (
-                  <div className="flex items-center gap-2 text-xs text-purple-700 bg-purple-50 py-2 px-3 rounded-full w-fit">
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>SafePay AI is analyzing records...</span>
+                  {/* Chat Message Stream */}
+                  <div className="flex-1 p-4 sm:p-5 overflow-y-auto space-y-4">
+                    {activeElder &&
+                      (chatMessagesByElder[activeElder.id] || []).map((msg) => (
+                        <div
+                          key={msg.id}
+                          className={`flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                            msg.role === 'user' ? 'items-end' : 'items-start'
+                          }`}
+                        >
+                          <div
+                            className={`max-w-xl p-4 rounded-2xl text-xs leading-relaxed shadow-2xs transition-all ${
+                              msg.role === 'user'
+                                ? 'bg-purple-600 text-white rounded-br-xs shadow-purple-600/20'
+                                : chatDark
+                                ? 'bg-slate-900 border border-white/10 text-slate-100 rounded-bl-xs'
+                                : 'bg-white border border-slate-200/80 text-slate-800 rounded-bl-xs'
+                            }`}
+                          >
+                            {msg.role === 'assistant' ? (
+                              <FormattedMessage content={msg.content} isDark={chatDark} />
+                            ) : (
+                              <div className="whitespace-pre-line">{msg.content}</div>
+                            )}
+
+                            {/* Draft SMS check-in box */}
+                            {msg.draftMessage && (
+                              <div
+                                className={`mt-3 p-3 rounded-xl border space-y-2 ${
+                                  chatDark
+                                    ? 'bg-purple-950/30 border-purple-500/20 text-purple-200'
+                                    : 'bg-purple-50 border-purple-200/70 text-purple-950'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between text-[11px] font-bold">
+                                  <span className={chatDark ? 'text-purple-300' : 'text-purple-900'}>
+                                    Draft Check-In Message:
+                                  </span>
+                                  <button
+                                    onClick={() => handleCopyDraft(msg.draftMessage!, msg.id)}
+                                    className="flex items-center gap-1 text-purple-400 hover:text-purple-300 transition-colors"
+                                  >
+                                    {copiedDraftId === msg.id ? (
+                                      <>
+                                        <Check className="w-3 h-3 text-emerald-500" />
+                                        <span>Copied!</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy className="w-3 h-3" />
+                                        <span>Copy SMS</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                                <div
+                                  className={`font-mono text-[11px] p-2 rounded-lg border ${
+                                    chatDark
+                                      ? 'bg-slate-900/80 border-purple-500/20 text-slate-200'
+                                      : 'bg-white border-purple-200/40 text-slate-800'
+                                  }`}
+                                >
+                                  &ldquo;{msg.draftMessage}&rdquo;
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <span className={`text-[10px] mt-1 px-1 ${chatDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                            {msg.timestamp}
+                          </span>
+
+                          {/* Suggested quick reply chips */}
+                          {msg.role === 'assistant' && msg.suggestedActions && msg.suggestedActions.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-2 max-w-xl">
+                              {msg.suggestedActions.map((action, i) => (
+                                <button
+                                  key={i}
+                                  onClick={() => handleSendChatMessage(action)}
+                                  className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-all shadow-2xs text-left active:scale-95 ${
+                                    chatDark
+                                      ? 'bg-slate-900 text-purple-300 hover:bg-slate-800 border-purple-500/30'
+                                      : 'bg-white text-purple-700 hover:bg-purple-50 border-purple-200/70'
+                                  }`}
+                                >
+                                  {action}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                    {chatLoading && (
+                      <div
+                        className={`flex items-center gap-2 text-xs py-2 px-3 rounded-full w-fit ${
+                          chatDark ? 'bg-purple-950/40 text-purple-300' : 'bg-purple-50 text-purple-700'
+                        }`}
+                      >
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>SafePay AI is analyzing records...</span>
+                      </div>
+                    )}
+                    <div ref={chatEndRef} />
                   </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
 
-              {/* Chat Input Bar */}
-              <div className="p-4 bg-white/80 border-t border-slate-200/70">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSendChatMessage();
-                  }}
-                  className="flex items-center gap-2 max-w-4xl mx-auto"
-                >
-                  <input
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    placeholder={`Ask anything about ${activeElder?.fullName || 'the senior'}'s payments, merchants, or fraud alerts...`}
-                    className="flex-1 px-4 py-2.5 rounded-full bg-white border border-slate-200 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-purple-600/20 shadow-2xs"
-                  />
-                  <button
-                    type="submit"
-                    disabled={chatLoading || !chatInput.trim()}
-                    className="p-2.5 rounded-full bg-slate-950 text-white hover:bg-slate-800 disabled:opacity-40 transition-all shadow-xs shrink-0"
-                    title="Send message"
+                  {/* Chat Input Bar (Only send button and voice button, No receiving context) */}
+                  <div
+                    className={`p-4 border-t backdrop-blur-md transition-colors ${
+                      chatDark ? 'bg-slate-900/80 border-white/10' : 'bg-white/80 border-black/5'
+                    }`}
                   >
-                    <Send className="w-4 h-4 text-purple-400" />
-                  </button>
-                </form>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleSendChatMessage();
+                      }}
+                      className="flex items-center gap-2 max-w-4xl mx-auto"
+                    >
+                      <input
+                        type="text"
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        placeholder={`Ask anything about ${activeElder?.fullName || 'the senior'}'s payments, merchants, or fraud alerts...`}
+                        className={`flex-1 px-4 py-2.5 rounded-full border text-xs outline-none transition-all shadow-2xs ${
+                          chatDark
+                            ? 'bg-slate-800 border-white/10 text-white placeholder:text-slate-500 focus:border-purple-500'
+                            : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-purple-600'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setVoiceActive((prev) => !prev)}
+                        className={`p-2.5 rounded-full border transition-all shrink-0 ${
+                          voiceActive
+                            ? 'bg-rose-500 text-white border-rose-600 animate-pulse'
+                            : chatDark
+                            ? 'bg-slate-800 text-slate-300 border-white/10 hover:bg-slate-700'
+                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                        }`}
+                        title={voiceActive ? 'Listening Active' : 'Start Voice Input'}
+                      >
+                        <Mic className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={chatLoading || !chatInput.trim()}
+                        className="p-2.5 rounded-full bg-slate-950 text-white hover:bg-slate-800 disabled:opacity-40 transition-all shadow-xs shrink-0 active:scale-95"
+                        title="Send message"
+                      >
+                        <Send className="w-4 h-4 text-purple-400" />
+                      </button>
+                    </form>
+                  </div>
+                </main>
               </div>
             </div>
           </div>
