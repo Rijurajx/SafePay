@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
+import { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,7 @@ export async function PATCH(req: NextRequest) {
       dateOfBirth,
     } = body;
 
-    const dataToUpdate: Record<string, unknown> = {};
+    const dataToUpdate: Prisma.UserUpdateInput = {};
 
     if (fullName !== undefined) {
       if (typeof fullName !== 'string' || !fullName.trim()) {
@@ -92,7 +93,7 @@ export async function PATCH(req: NextRequest) {
           metadata: {
             updatedFields: Object.keys(dataToUpdate),
             timestamp: new Date().toISOString(),
-          },
+          } as Prisma.InputJsonValue,
         },
       });
     } catch (e) {

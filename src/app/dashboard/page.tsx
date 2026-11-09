@@ -529,7 +529,9 @@ export default function DashboardPage() {
   };
 
   const handleCopyDraft = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    }
     setCopiedDraftId(id);
     setTimeout(() => setCopiedDraftId(null), 2500);
   };
@@ -654,8 +656,8 @@ export default function DashboardPage() {
       if (!res.ok) {
         setProfileError(data.error || 'Failed to update profile');
       } else {
-        if (currentUser) {
-          setCurrentUser({ ...currentUser, ...data.user });
+        if (currentUser && data.user) {
+          setCurrentUser({ ...currentUser, ...(data.user as Partial<SessionUser>) });
         }
         setActionNotice({
           message: 'Caregiver profile updated successfully!',

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
-import { Role } from '@prisma/client';
+import { Role, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 export const dynamic = 'force-dynamic';
@@ -99,9 +99,15 @@ export async function PATCH(req: NextRequest) {
       where: { elderId },
     });
 
-    const thresholdNum = familyApprovalThreshold !== undefined ? Number(familyApprovalThreshold) : Number(existing?.familyApprovalThreshold || 100);
-    const dailyCapNum = absoluteDailyCap !== undefined ? Number(absoluteDailyCap) : Number(existing?.absoluteDailyCap || 1000);
-    const transCapNum = absoluteTransactionCap !== undefined ? Number(absoluteTransactionCap) : Number(existing?.absoluteTransactionCap || 500);
+    const thresholdNum = familyApprovalThreshold !== undefined
+      ? Number(familyApprovalThreshold)
+      : (existing?.familyApprovalThreshold ? Number(existing.familyApprovalThreshold.toString()) : 100);
+    const dailyCapNum = absoluteDailyCap !== undefined
+      ? Number(absoluteDailyCap)
+      : (existing?.absoluteDailyCap ? Number(existing.absoluteDailyCap.toString()) : 1000);
+    const transCapNum = absoluteTransactionCap !== undefined
+      ? Number(absoluteTransactionCap)
+      : (existing?.absoluteTransactionCap ? Number(existing.absoluteTransactionCap.toString()) : 500);
 
     if (thresholdNum <= 0 || dailyCapNum <= 0) {
       return NextResponse.json({ error: 'Limits must be positive values' }, { status: 400 });
@@ -156,7 +162,7 @@ export async function PATCH(req: NextRequest) {
             requireFamilyForNewRecipient: updated.requireFamilyForNewRecipient,
             requireFamilyForUnusual: updated.requireFamilyForUnusual,
             timestamp: new Date().toISOString(),
-          },
+          } as Prisma.InputJsonValue,
         },
       });
     } catch (auditErr) {

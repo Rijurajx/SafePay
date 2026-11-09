@@ -114,7 +114,15 @@ export async function GET(req: NextRequest) {
           category: a.paymentRequest.recipient.category,
           expiresAt: a.expiresAt.toISOString(),
           riskScore: a.paymentRequest.currentRiskAssessment?.riskScore || 75,
-          explanation: a.paymentRequest.currentRiskAssessment?.explanationContext,
+          explanation: a.paymentRequest.currentRiskAssessment?.explanationContext
+            ? (a.paymentRequest.currentRiskAssessment.explanationContext as {
+                summary?: string;
+                caregiverExplanation?: string;
+                seniorExplanation?: string;
+                suggestedQuestionsForSenior?: string[];
+                riskFactors?: string[];
+              })
+            : null,
         })),
       }, {
         headers: {
@@ -197,7 +205,9 @@ export async function GET(req: NextRequest) {
           currency: h.currency,
           merchantName: h.recipient.merchantName,
           category: h.recipient.category,
-          seniorMessage: (h.currentRiskAssessment?.explanationContext as { seniorMessage?: string } | null)?.seniorMessage ||
+          seniorMessage:
+            (h.currentRiskAssessment?.explanationContext as { seniorMessage?: string; seniorExplanation?: string } | null)?.seniorMessage ||
+            (h.currentRiskAssessment?.explanationContext as { seniorMessage?: string; seniorExplanation?: string } | null)?.seniorExplanation ||
             "We're checking in with your family to confirm this order.",
           createdAt: h.createdAt.toISOString(),
         })),

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
 import { createInvitationToken } from '@/lib/auth-tokens';
-import { Role, FamilyLinkStatus } from '@prisma/client';
+import { Role, FamilyLinkStatus, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 export const dynamic = 'force-dynamic';
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     let caregiverName = session.fullName;
 
     // 1. Update Caregiver's customized profile data
-    const caregiverData: Record<string, unknown> = {};
+    const caregiverData: Prisma.UserUpdateInput = {};
     if (fullName && typeof fullName === 'string' && fullName.trim()) {
       caregiverName = fullName.trim();
       caregiverData.fullName = caregiverName;
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       caregiverData.phoneNumber = String(caregiverPhone).trim();
     }
     if (caregiverNotification) {
-      caregiverData.preferredNotification = caregiverNotification;
+      caregiverData.preferredNotification = String(caregiverNotification).trim();
     }
 
     if (Object.keys(caregiverData).length > 0) {
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
         where: { email: normalizedContact },
       });
 
-      const elderDataToSave = {
+      const elderDataToSave: Prisma.UserUpdateInput = {
         fullName: trimmedElderName,
         ...(elderPhone ? { phoneNumber: String(elderPhone).trim() } : {}),
         ...(elderCity ? { city: String(elderCity).trim() } : {}),
@@ -99,7 +99,12 @@ export async function POST(req: NextRequest) {
         elder = await prisma.user.create({
           data: {
             email: normalizedContact,
-            ...elderDataToSave,
+            fullName: trimmedElderName,
+            ...(elderPhone ? { phoneNumber: String(elderPhone).trim() } : {}),
+            ...(elderCity ? { city: String(elderCity).trim() } : {}),
+            ...(elderZipCode ? { primaryZipCode: String(elderZipCode).trim() } : {}),
+            ...(emergencyContactName ? { emergencyContactName: String(emergencyContactName).trim() } : {}),
+            ...(emergencyContactPhone ? { emergencyContactPhone: String(emergencyContactPhone).trim() } : {}),
             roleDefault: Role.PROTECTED_USER,
             isActive: false, // Inactive until elder accepts invite
             isSynthetic: false,
@@ -154,7 +159,7 @@ export async function POST(req: NextRequest) {
             usualStartHour: 8,
             usualEndHour: 21,
             monthlyAverage: new Decimal(dailyCapNum * 0.4),
-            recipientStatistics: {},
+            recipientStatistics: {} as Prisma.InputJsonValue,
           },
         });
       }
@@ -223,7 +228,7 @@ export async function POST(req: NextRequest) {
             elderId,
             hasElderConfigured: !!elderId,
             timestamp: new Date().toISOString(),
-          },
+          } as Prisma.InputJsonValue,
         },
       });
     } catch (e) {
