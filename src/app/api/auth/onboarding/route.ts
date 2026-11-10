@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
 import { createInvitationToken } from '@/lib/auth-tokens';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { Role, FamilyLinkStatus, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -221,8 +222,23 @@ export async function POST(req: NextRequest) {
       });
 
       const host = req.headers.get('host') || 'localhost:3000';
-      const protocol = host.includes('localhost') ? 'http' : 'https';
+      const protocol = req.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
       inviteLink = `${protocol}://${host}/invite/accept?token=${encodeURIComponent(token)}`;
+
+      // Direct email dispatch to senior - link is never exposed to caregiver
+      try {
+        const adminSb = createAdminClient();
+        await adminSb.auth.admin.inviteUserByEmail(normalizedContact, {
+          redirectTo: inviteLink,
+          data: {
+            role: 'PROTECTED_USER',
+            caregiverName,
+            elderFullName: trimmedElderName,
+          },
+        });
+      } catch (emailErr) {
+        console.warn('Direct invite email dispatch note:', emailErr);
+      }
     }
 
     // 3. Audit Event
@@ -236,6 +252,7 @@ export async function POST(req: NextRequest) {
             caregiverName,
             elderId,
             hasElderConfigured: !!elderId,
+            invitationDispatchedDirectlyToEmail: elderFullName ? true : false,
             timestamp: new Date().toISOString(),
           } as Prisma.InputJsonValue,
         },
@@ -246,10 +263,14 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Caregiver profile and protection settings configured successfully',
+      message: elderFullName
+        ? `Invitation sent directly to ${elderFullName}'s private email. For security, only the senior member can accept the invitation from their inbox.`
+        : 'Caregiver profile configured successfully',
       caregiverName,
       elderId,
-      inviteLink,
+      elderName: elderFullName ? String(elderFullName).trim() : null,
+      elderEmail: elderEmailOrPhone ? String(elderEmailOrPhone).trim().toLowerCase() : null,
+      // inviteLink is INTENTIONALLY omitted so caregivers cannot copy and self-accept
     });
   } catch (error: unknown) {
     console.error('Onboarding setup error:', error);

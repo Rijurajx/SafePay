@@ -11,7 +11,6 @@ import {
   Clock,
   UserPlus,
   Users,
-  Eye,
   RefreshCw,
   ShoppingBag,
   AlertTriangle,
@@ -64,6 +63,22 @@ interface LinkedElder {
     requireFamilyForUnusual?: boolean;
   };
   todaySpend: number;
+  monthSpend?: number;
+  remainingDailyCap?: number;
+  remainingMonthlyBudget?: number;
+}
+
+interface LimitRequestItem {
+  id: string;
+  elderId?: string;
+  elderName?: string;
+  limitType: 'DAILY' | 'MONTHLY';
+  requestedAmount: number;
+  currentDailyCap?: number;
+  currentMonthlyBudget?: number;
+  reason: string;
+  status: string;
+  createdAt: string;
 }
 
 interface PendingApproval {
@@ -244,6 +259,8 @@ export default function DashboardPage() {
   const [linkedElders, setLinkedElders] = useState<LinkedElder[]>([]);
   const [selectedElderId, setSelectedElderId] = useState<string>('');
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
+  const [pendingLimitRequests, setPendingLimitRequests] = useState<LimitRequestItem[]>([]);
+  const [decidingLimitId, setDecidingLimitId] = useState<string | null>(null);
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
 
   // Elder Connect form
@@ -257,9 +274,7 @@ export default function DashboardPage() {
   const [createdInvite, setCreatedInvite] = useState<{
     elderName: string;
     contact: string;
-    inviteLink: string;
   } | null>(null);
-  const [copiedInvite, setCopiedInvite] = useState(false);
 
   // Transactions Ledger State
   const [ledgerItems, setLedgerItems] = useState<LedgerItem[]>([]);
@@ -277,12 +292,24 @@ export default function DashboardPage() {
 
   // Senior state
   const [seniorTodaySpend, setSeniorTodaySpend] = useState<number>(0);
+  const [seniorMonthSpend, setSeniorMonthSpend] = useState<number>(0);
   const [seniorDailyCap, setSeniorDailyCap] = useState<number>(1000);
   const [seniorFamilyThreshold, setSeniorFamilyThreshold] = useState<number>(100);
   const [seniorMonthlyBudget, setSeniorMonthlyBudget] = useState<number>(2000);
+  const [seniorRemainingDailyCap, setSeniorRemainingDailyCap] = useState<number>(1000);
+  const [seniorRemainingMonthlyBudget, setSeniorRemainingMonthlyBudget] = useState<number>(2000);
   const [seniorGuardians, setSeniorGuardians] = useState<SeniorGuardian[]>([]);
   const [seniorHolds, setSeniorHolds] = useState<SeniorHold[]>([]);
   const [seniorRecentPayments, setSeniorRecentPayments] = useState<RecentPayment[]>([]);
+  const [seniorPendingLimitRequests, setSeniorPendingLimitRequests] = useState<LimitRequestItem[]>([]);
+
+  // Senior Limit Request Modal State
+  const [isSeniorLimitModalOpen, setIsSeniorLimitModalOpen] = useState(false);
+  const [seniorLimitType, setSeniorLimitType] = useState<'DAILY' | 'MONTHLY'>('DAILY');
+  const [seniorLimitAmount, setSeniorLimitAmount] = useState('100');
+  const [seniorLimitReason, setSeniorLimitReason] = useState('');
+  const [seniorLimitSubmitting, setSeniorLimitSubmitting] = useState(false);
+  const [seniorLimitSuccess, setSeniorLimitSuccess] = useState<string | null>(null);
 
   // Profile edit modal state
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -343,11 +370,21 @@ export default function DashboardPage() {
           setSelectedElderId('');
         }
         setPendingApprovals(data.pendingApprovals || []);
+        setPendingLimitRequests(data.pendingLimitRequests || []);
       } else {
-        setSeniorTodaySpend(data.todaySpend || 0);
-        setSeniorDailyCap(data.dailyCap || 1000);
+        const today = data.todaySpend || 0;
+        const month = data.monthSpend || 0;
+        const daily = data.dailyCap || 1000;
+        const monthly = data.monthlyBudget || 2000;
+
+        setSeniorTodaySpend(today);
+        setSeniorMonthSpend(month);
+        setSeniorDailyCap(daily);
         setSeniorFamilyThreshold(data.familyThreshold || 100);
-        setSeniorMonthlyBudget(data.monthlyBudget || 2000);
+        setSeniorMonthlyBudget(monthly);
+        setSeniorRemainingDailyCap(data.remainingDailyCap !== undefined ? data.remainingDailyCap : Math.max(0, daily - today));
+        setSeniorRemainingMonthlyBudget(data.remainingMonthlyBudget !== undefined ? data.remainingMonthlyBudget : Math.max(0, monthly - month));
+        setSeniorPendingLimitRequests(data.pendingLimitRequests || []);
         setSeniorGuardians(data.guardians || []);
         setSeniorHolds(data.activeHolds || []);
         setSeniorRecentPayments(data.recentPayments || []);
@@ -601,26 +638,6 @@ export default function DashboardPage() {
     }
   };
 
-  const handleSwitchFamily = async (targetUserId: string) => {
-    setActionNotice(null);
-    try {
-      const res = await fetch('/api/auth/switch-family', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUserId }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setActionNotice({ message: data.message || 'Switched account view', type: 'success' });
-        await fetchSummary();
-      } else {
-        setActionNotice({ message: data.error || 'Failed to switch view', type: 'error' });
-      }
-    } catch {
-      setActionNotice({ message: 'Error switching family view', type: 'error' });
-    }
-  };
-
   const openProfileModal = () => {
     setProfileName(currentUser?.fullName || '');
     setProfilePhone(currentUser?.phoneNumber || '');
@@ -749,7 +766,6 @@ export default function DashboardPage() {
         setCreatedInvite({
           elderName: connectName.trim(),
           contact: connectEmail.trim(),
-          inviteLink: data.inviteLink,
         });
         await fetchSummary();
       }
@@ -760,11 +776,58 @@ export default function DashboardPage() {
     }
   };
 
-  const copyInviteToClipboard = () => {
-    if (!createdInvite?.inviteLink) return;
-    navigator.clipboard.writeText(createdInvite.inviteLink);
-    setCopiedInvite(true);
-    setTimeout(() => setCopiedInvite(false), 2500);
+  const handleDecideLimitRequest = async (requestId: string, decision: 'APPROVED' | 'DECLINED') => {
+    setDecidingLimitId(requestId);
+    try {
+      const res = await fetch(`/api/family/limit-requests/${requestId}/decide`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to process decision');
+      setActionNotice({
+        message: data.message || (decision === 'APPROVED' ? 'Limit request approved!' : 'Limit request declined.'),
+        type: 'success',
+      });
+      await fetchSummary();
+    } catch (e: unknown) {
+      setActionNotice({
+        message: e instanceof Error ? e.message : 'Error processing decision',
+        type: 'error',
+      });
+    } finally {
+      setDecidingLimitId(null);
+    }
+  };
+
+  const handleSeniorRequestLimit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSeniorLimitSubmitting(true);
+    try {
+      const res = await fetch('/api/family/limit-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          limitType: seniorLimitType,
+          requestedAmount: Number(seniorLimitAmount),
+          reason: seniorLimitReason,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to submit limit request');
+      setSeniorLimitSuccess(`Request for +$${seniorLimitAmount} dispatched to your family guardian!`);
+      await fetchSummary();
+      setTimeout(() => {
+        setIsSeniorLimitModalOpen(false);
+        setSeniorLimitSuccess(null);
+        setSeniorLimitReason('');
+      }, 3000);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error submitting request');
+    } finally {
+      setSeniorLimitSubmitting(false);
+    }
   };
 
   // Filtered transactions for the ledger view
@@ -940,51 +1003,111 @@ export default function DashboardPage() {
                 </div>
                 <p className="text-sm text-slate-800 font-medium">
                   {seniorGuardians.length > 0
-                    ? `${seniorGuardians.map((g) => `${g.fullName} (${g.relationship})`).join(', ')} are linked to confirm unusual or large payments.`
+                    ? `${seniorGuardians.map((g) => `${g.fullName} (${g.relationship})`).join(', ')} are actively linked to safeguard your spending.`
                     : 'Your family caregivers are linked to confirm unusual or large payments.'}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {seniorGuardians.length > 0 && (
-                  <button
-                    onClick={() => handleSwitchFamily(seniorGuardians[0].id)}
-                    className="px-3 py-1 text-xs font-semibold text-slate-800 rounded-full bg-slate-100 hover:bg-white border border-slate-200/80 flex items-center gap-1 shadow-2xs transition-all"
-                    title="Switch session to Caregiver approval mode"
-                  >
-                    <Eye className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Switch to Caregiver View</span>
-                  </button>
-                )}
                 <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-900 border border-purple-200">
-                  Hold: ${seniorFamilyThreshold.toFixed(0)}
+                  Review Threshold: ${seniorFamilyThreshold.toFixed(0)}
                 </span>
                 <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">
-                  Cap: ${seniorDailyCap.toFixed(0)}
+                  Daily Cap: ${seniorDailyCap.toFixed(0)}
                 </span>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              <div className="liquid-glass-subtle rounded-2xl p-5 border border-white">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Today&apos;s Purchases</span>
-                <div className="text-3xl font-extrabold text-slate-950 mt-1">${seniorTodaySpend.toFixed(2)}</div>
-                <p className="text-xs text-slate-500 mt-1">Routine purchases process normally.</p>
+            {/* Pending Limit Request Banner if any */}
+            {seniorPendingLimitRequests.length > 0 && (
+              <div className="p-4 rounded-2xl bg-purple-50/90 border border-purple-200 text-purple-950 flex items-start justify-between gap-3 text-xs">
+                <div className="flex items-start gap-2.5">
+                  <Clock className="w-4 h-4 text-purple-600 mt-0.5 shrink-0 animate-pulse" />
+                  <div>
+                    <span className="font-bold text-purple-900 block">
+                      Limit Increase Request Pending Review
+                    </span>
+                    <p className="text-purple-800 text-[11px] mt-0.5">
+                      You requested +${seniorPendingLimitRequests[0].requestedAmount.toFixed(0)} {seniorPendingLimitRequests[0].limitType.toLowerCase()} allowance
+                      {seniorPendingLimitRequests[0].reason ? ` for "${seniorPendingLimitRequests[0].reason}"` : ''}. Your family guardian has been notified.
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-200 text-purple-900 shrink-0">
+                  Awaiting Guardian
+                </span>
+              </div>
+            )}
+
+            {/* Decreasing Caps & Balances Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+              {/* Daily Remaining Cap */}
+              <div className="liquid-glass-subtle rounded-2xl p-5 border border-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Remaining Today</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    Daily
+                  </span>
+                </div>
+                <div className="text-2xl sm:text-3xl font-black text-slate-950">
+                  ${seniorRemainingDailyCap.toFixed(2)}
+                </div>
+                <div className="w-full bg-slate-200/80 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, (seniorTodaySpend / Math.max(1, seniorDailyCap)) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  ${seniorTodaySpend.toFixed(2)} spent of ${seniorDailyCap.toFixed(2)} daily cap
+                </p>
               </div>
 
-              <div className="liquid-glass-subtle rounded-2xl p-5 border border-white flex flex-col justify-between">
+              {/* Monthly Remaining Budget */}
+              <div className="liquid-glass-subtle rounded-2xl p-5 border border-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Remaining Month</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                    Monthly
+                  </span>
+                </div>
+                <div className="text-2xl sm:text-3xl font-black text-slate-950">
+                  ${seniorRemainingMonthlyBudget.toFixed(2)}
+                </div>
+                <div className="w-full bg-slate-200/80 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-blue-500 h-1.5 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, (seniorMonthSpend / Math.max(1, seniorMonthlyBudget)) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  ${seniorMonthSpend.toFixed(2)} spent of ${seniorMonthlyBudget.toFixed(2)} limit
+                </p>
+              </div>
+
+              {/* Actions: Request Limit or Checkout */}
+              <div className="liquid-glass-subtle rounded-2xl p-5 border border-white flex flex-col justify-between space-y-3">
                 <div>
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Protected Shopping</span>
-                  <p className="text-xs text-slate-700 font-medium mt-1">
-                    Ready to test shopping online? Launch the SafePay simulated checkout experience.
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Need Additional Funds?</span>
+                  <p className="text-[11px] text-slate-600 font-medium mt-1">
+                    Request an instant limit increase from your linked caregivers.
                   </p>
                 </div>
-                <Link
-                  href="/checkout"
-                  className="mt-3 px-5 py-2.5 rounded-full bg-slate-950 text-white text-xs font-bold hover:bg-slate-800 transition-all text-center shadow-sm flex items-center justify-center gap-2 active:scale-95"
-                >
-                  <ShoppingBag className="w-4 h-4 text-purple-300" />
-                  <span>Try Protected Checkout</span>
-                </Link>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => setIsSeniorLimitModalOpen(true)}
+                    className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-purple-200" />
+                    <span>Request Limit Increase</span>
+                  </button>
+                  <Link
+                    href="/checkout"
+                    className="w-full py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 active:scale-95"
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Protected Checkout</span>
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
@@ -1057,6 +1180,122 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+
+          {/* SENIOR LIMIT INCREASE MODAL */}
+          {isSeniorLimitModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm">
+                      $
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Request Limit Increase</h3>
+                      <p className="text-[11px] text-slate-500">Ask your family caregiver for additional funds</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsSeniorLimitModalOpen(false)}
+                    className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1"
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                {seniorLimitSuccess ? (
+                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold text-center space-y-1">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto" />
+                    <p>{seniorLimitSuccess}</p>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSeniorRequestLimit} className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Limit to Increase</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSeniorLimitType('DAILY')}
+                          className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                            seniorLimitType === 'DAILY'
+                              ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          Daily Spending Cap
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSeniorLimitType('MONTHLY')}
+                          className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                            seniorLimitType === 'MONTHLY'
+                              ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          Monthly Budget
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Requested Additional Amount ($ USD)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                        <input
+                          type="number"
+                          step="10"
+                          min="10"
+                          max="2000"
+                          required
+                          value={seniorLimitAmount}
+                          onChange={(e) => setSeniorLimitAmount(e.target.value)}
+                          className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          placeholder="100"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Reason for Guardian (Optional)
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={seniorLimitReason}
+                        onChange={(e) => setSeniorLimitReason(e.target.value)}
+                        placeholder="e.g., Grocery shopping, medicine refill, doctor prescription"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsSeniorLimitModalOpen(false)}
+                        className="flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={seniorLimitSubmitting}
+                        className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white transition-all shadow-sm flex items-center justify-center gap-1.5"
+                      >
+                        {seniorLimitSubmitting ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <span>Submit Request</span>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
+          )}
         </main>
       </div>
     );
@@ -1437,13 +1676,13 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="liquid-glass rounded-2xl p-5 border border-white/80 shadow-xs flex flex-col justify-between">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Today&apos;s Spend
+                  Remaining Daily Cap
                 </span>
                 <div className="mt-2 text-2xl font-extrabold text-slate-950">
-                  ${(activeElder?.todaySpend || 0).toFixed(2)}
+                  ${(activeElder?.remainingDailyCap !== undefined ? activeElder.remainingDailyCap : Math.max(0, (activeElder?.protectionSettings.absoluteDailyCap || 1000) - (activeElder?.todaySpend || 0))).toFixed(2)}
                 </div>
                 <div className="mt-1 text-[11px] text-slate-500">
-                  Daily Cap: ${(activeElder?.protectionSettings.absoluteDailyCap || 1000).toLocaleString()}
+                  ${(activeElder?.todaySpend || 0).toFixed(2)} spent of ${(activeElder?.protectionSettings.absoluteDailyCap || 1000).toLocaleString()} cap
                 </div>
               </div>
 
@@ -1459,12 +1698,14 @@ export default function DashboardPage() {
 
               <div className="liquid-glass rounded-2xl p-5 border border-white/80 shadow-xs flex flex-col justify-between">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Monthly Target
+                  Remaining Monthly Budget
                 </span>
                 <div className="mt-2 text-2xl font-extrabold text-blue-950">
-                  ${(activeElder?.protectionSettings.monthlyBudget || 2000).toLocaleString()}
+                  ${(activeElder?.remainingMonthlyBudget !== undefined ? activeElder.remainingMonthlyBudget : Math.max(0, (activeElder?.protectionSettings.monthlyBudget || 2000) - (activeElder?.monthSpend || 0))).toFixed(2)}
                 </div>
-                <div className="mt-1 text-[11px] text-slate-500">Monthly spending ceiling</div>
+                <div className="mt-1 text-[11px] text-slate-500">
+                  ${(activeElder?.monthSpend || 0).toFixed(2)} spent of ${(activeElder?.protectionSettings.monthlyBudget || 2000).toLocaleString()} limit
+                </div>
               </div>
 
               <div className="liquid-glass rounded-2xl p-5 border border-white/80 shadow-xs flex flex-col justify-between">
@@ -1472,16 +1713,92 @@ export default function DashboardPage() {
                   Pending Approvals
                 </span>
                 <div className="mt-2 text-2xl font-extrabold text-slate-950 flex items-center gap-2">
-                  <span>{pendingApprovals.length}</span>
-                  {pendingApprovals.length > 0 && (
+                  <span>{pendingApprovals.length + pendingLimitRequests.length}</span>
+                  {(pendingApprovals.length > 0 || pendingLimitRequests.length > 0) && (
                     <span className="text-xs font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">
                       Needs Review
                     </span>
                   )}
                 </div>
-                <div className="mt-1 text-[11px] text-slate-500">Held PayPal orders</div>
+                <div className="mt-1 text-[11px] text-slate-500">
+                  {pendingApprovals.length} orders, {pendingLimitRequests.length} limit requests
+                </div>
               </div>
             </div>
+
+            {/* Pending Limit Increase Requests Section */}
+            {pendingLimitRequests.length > 0 && (
+              <div className="p-6 rounded-3xl bg-linear-to-r from-purple-50 via-indigo-50 to-white border border-purple-200/90 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                      $
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-purple-950">
+                        {pendingLimitRequests.length} Limit Increase Request{pendingLimitRequests.length > 1 ? 's' : ''} Pending Review
+                      </h3>
+                      <p className="text-xs text-purple-800/80">
+                        Senior family members have requested additional spending allowance
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {pendingLimitRequests.map((lr) => (
+                    <div
+                      key={lr.id}
+                      className="p-5 rounded-2xl bg-white border border-purple-200/90 shadow-2xs space-y-3.5"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="text-xs font-bold text-purple-700">{lr.elderName}</div>
+                          <div className="text-base font-extrabold text-slate-900">
+                            +{lr.limitType === 'DAILY' ? 'Daily Spending Cap' : 'Monthly Budget'}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            Current Limit: ${lr.limitType === 'DAILY' ? lr.currentDailyCap?.toFixed(0) : lr.currentMonthlyBudget?.toFixed(0)}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xl font-black text-purple-900">
+                            +${lr.requestedAmount.toFixed(2)}
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                            Awaiting Approval
+                          </span>
+                        </div>
+                      </div>
+
+                      {lr.reason && (
+                        <div className="p-3 rounded-xl bg-purple-50/70 border border-purple-100 text-xs text-purple-900 leading-relaxed">
+                          <span className="font-bold text-purple-950">Senior Note:</span> &ldquo;{lr.reason}&rdquo;
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          onClick={() => handleDecideLimitRequest(lr.id, 'APPROVED')}
+                          disabled={decidingLimitId === lr.id}
+                          className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Approve (+${lr.requestedAmount.toFixed(0)})</span>
+                        </button>
+                        <button
+                          onClick={() => handleDecideLimitRequest(lr.id, 'DECLINED')}
+                          disabled={decidingLimitId === lr.id}
+                          className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Pending Approvals Review Section */}
             {pendingApprovals.length > 0 && (
@@ -2537,47 +2854,32 @@ export default function DashboardPage() {
                 <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto shadow-xs">
                   <CheckCircle2 className="w-6 h-6" />
                 </div>
-                <div className="text-center space-y-1">
-                  <h3 className="text-lg font-bold text-slate-950">Invitation Ready for {createdInvite.elderName}</h3>
+                <div className="text-center space-y-1.5">
+                  <h3 className="text-lg font-bold text-slate-950">Invitation Dispatched Directly</h3>
                   <p className="text-xs text-slate-600">
-                    SafePay requires <strong className="text-slate-900">{createdInvite.elderName}</strong> to accept your family invitation before financial oversight begins.
+                    SafePay has securely emailed an activation invite to{' '}
+                    <strong className="text-slate-900 font-mono">{createdInvite.contact}</strong>.
                   </p>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="block text-xs font-semibold text-slate-700">Invitation Link:</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={createdInvite.inviteLink}
-                      className="flex-1 px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-mono outline-none"
-                    />
-                    <button
-                      onClick={copyInviteToClipboard}
-                      className="px-4 py-2.5 rounded-xl bg-slate-950 text-white text-xs font-semibold shrink-0 flex items-center gap-1.5 transition-all active:scale-95 shadow-xs"
-                    >
-                      {copiedInvite ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Copy Link</span>
-                        </>
-                      )}
-                    </button>
+                <div className="p-4 rounded-2xl bg-purple-50/80 border border-purple-200/80 text-left space-y-1 text-xs text-purple-950">
+                  <div className="flex items-center gap-1.5 font-bold text-purple-900">
+                    <Sparkles className="w-4 h-4 text-purple-600" />
+                    <span>Elder Consent Protected</span>
                   </div>
+                  <p className="text-purple-800 text-[11px] leading-relaxed">
+                    To safeguard elder independence and prevent unauthorized enrollment, invitation links are delivered exclusively to the senior&apos;s email and cannot be viewed or accepted from the caregiver portal.
+                  </p>
                 </div>
 
                 <button
                   onClick={() => {
                     setIsConnectModalOpen(false);
                     setCreatedInvite(null);
+                    setConnectName('');
+                    setConnectEmail('');
                   }}
-                  className="w-full py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
+                  className="w-full py-3 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-sm"
                 >
                   Done
                 </button>

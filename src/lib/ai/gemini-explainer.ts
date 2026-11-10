@@ -134,27 +134,48 @@ export function generateDeterministicFallback(input: ExplanationInput): GeminiEx
   const { amount, merchantName, elderName, signals, medianSpend } = input;
   const firstName = elderName.split(' ')[0] || 'Dad';
 
+  const isDuplicate = signals.some((s) => s.code === 'DUPLICATE_PAYMENT_SUSPECTED');
+  const isMonthlyOver = signals.some((s) => s.code === 'EXCEEDS_MONTHLY_BUDGET');
   const isNewMerchant = signals.some((s) => s.code === 'NEW_RECIPIENT');
   const isHighSpend = signals.some((s) => s.code === 'EXCEEDS_FAMILY_THRESHOLD' || s.code === 'HIGH_VARIANCE_FROM_MEDIAN');
 
+  let headline = `$${amount.toFixed(2)} at ${merchantName} needs family confirmation`;
   let plainEnglishSummary = `This $${amount.toFixed(2)} order at ${merchantName} is awaiting caregiver confirmation.`;
-  if (isNewMerchant && isHighSpend) {
+  let suggestedQuestions = [
+    `"Hi ${firstName}, did you order something from ${merchantName} today?"`,
+    `"Let me know if you need any help verifying the order details or delivery address!"`,
+  ];
+  let seniorMessage = `Checking in with family to confirm this payment — we'll update you in just a moment!`;
+
+  if (isDuplicate) {
+    headline = `Potential duplicate charge of $${amount.toFixed(2)} at ${merchantName}`;
+    plainEnglishSummary = `An identical charge of $${amount.toFixed(2)} to ${merchantName} was made recently. SafePay placed this transaction on hold to prevent accidental double-billing.`;
+    suggestedQuestions = [
+      `"Hi ${firstName}, did you intend to place this second order of $${amount.toFixed(2)} with ${merchantName}?"`,
+      `"Did the payment screen freeze or reload during checkout?"`,
+    ];
+    seniorMessage = `We noticed an identical payment to ${merchantName} was made recently. We're double-checking with family so you aren't charged twice!`;
+  } else if (isMonthlyOver) {
+    headline = `Monthly spending limit reached ($${amount.toFixed(2)} at ${merchantName})`;
+    plainEnglishSummary = `This $${amount.toFixed(2)} purchase brings ${firstName}'s monthly total beyond the allocated family budget.`;
+    suggestedQuestions = [
+      `"Hi ${firstName}, would you like us to increase your monthly spending limit for this purchase?"`,
+    ];
+    seniorMessage = `This purchase is slightly over this month's budget. We've sent a quick note to family to approve it!`;
+  } else if (isNewMerchant && isHighSpend) {
     plainEnglishSummary = `This is ${firstName}'s first purchase at ${merchantName}, and the $${amount.toFixed(2)} total is above the typical $${(medianSpend || 45).toFixed(2)} spending baseline.`;
   } else if (isNewMerchant) {
     plainEnglishSummary = `${firstName} has not ordered from ${merchantName} previously. We've placed it on hold for quick verification.`;
   } else if (isHighSpend) {
-    plainEnglishSummary = `The $${amount.toFixed(2)} total exceeds ${firstName}'s usual daily threshold. Maya and David have been notified for dual authorization.`;
+    plainEnglishSummary = `The $${amount.toFixed(2)} total exceeds ${firstName}'s usual threshold. Caregivers have been notified for review.`;
   }
 
   return {
-    headline: `$${amount.toFixed(2)} at ${merchantName} needs family confirmation`,
+    headline,
     plainEnglishSummary,
-    merchantAnalysis: `${merchantName} is an external merchant. No prior verified payment history found for this family account.`,
-    suggestedQuestions: [
-      `"Hi ${firstName}, did you order something from ${merchantName} today?"`,
-      `"Let me know if you need any help verifying the order details or delivery address!"`,
-    ],
-    seniorMessage: `Checking in with Maya & David to confirm this payment — we'll update you in just a moment!`,
+    merchantAnalysis: `${merchantName} is categorized under ${input.category || 'general merchandise'}.`,
+    suggestedQuestions,
+    seniorMessage,
     modelUsed: 'deterministic-fallback',
     generatedAt: new Date().toISOString(),
   };

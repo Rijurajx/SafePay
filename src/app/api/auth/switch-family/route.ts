@@ -23,20 +23,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, user: session });
     }
 
-    // Verify active family relationship in either direction
+    // STRICT SECURITY POLICY:
+    // Protected senior members can NEVER switch into a caregiver's account or approve transactions.
+    if (session.roleDefault === 'PROTECTED_USER') {
+      return NextResponse.json(
+        { error: 'Security Violation: Senior member accounts cannot access caregiver accounts or approve payments.' },
+        { status: 403 }
+      );
+    }
+
+    // Verify active family relationship: Caregiver can only access their linked elders
     const link = await prisma.familyLink.findFirst({
       where: {
         status: 'ACTIVE',
-        OR: [
-          { caregiverId: session.id, elderId: targetUserId },
-          { elderId: session.id, caregiverId: targetUserId },
-        ],
+        caregiverId: session.id,
+        elderId: targetUserId,
       },
     });
 
     if (!link) {
       return NextResponse.json(
-        { error: 'You do not have an active family link with this user' },
+        { error: 'You do not have an active family link with this senior member' },
         { status: 403 }
       );
     }

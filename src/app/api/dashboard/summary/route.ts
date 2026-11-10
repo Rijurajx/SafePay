@@ -52,10 +52,20 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: 'desc' },
       });
 
+      // Start of day and start of month
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
       // Today's total spending by elders
       const spendingByElder: Record<string, number> = {};
+      const monthlySpendingByElder: Record<string, number> = {};
+
       for (const eId of elderIds) {
-        const sum = await prisma.paymentRequest.aggregate({
+        const sumToday = await prisma.paymentRequest.aggregate({
           where: {
             elderId: eId,
             status: PaymentRequestStatus.SETTLED,
@@ -63,46 +73,97 @@ export async function GET(req: NextRequest) {
           },
           _sum: { amount: true },
         });
-        spendingByElder[eId] = Number(sum._sum.amount?.toString() || 0);
+        spendingByElder[eId] = Number(sumToday._sum.amount?.toString() || 0);
+
+        const sumMonth = await prisma.paymentRequest.aggregate({
+          where: {
+            elderId: eId,
+            status: PaymentRequestStatus.SETTLED,
+            settledAt: { gte: startOfMonth },
+          },
+          _sum: { amount: true },
+        });
+        monthlySpendingByElder[eId] = Number(sumMonth._sum.amount?.toString() || 0);
       }
+
+      // Pending Limit Increase Requests
+      const limitRequestEvents = await prisma.auditEvent.findMany({
+        where: {
+          eventType: 'LIMIT_INCREASE_REQUESTED',
+          oldState: 'PENDING',
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      });
+
+      const pendingLimitRequests = limitRequestEvents
+        .filter((ev) => {
+          const meta = ev.metadata as Record<string, unknown> | null;
+          return meta && typeof meta.elderId === 'string' && elderIds.includes(meta.elderId);
+        })
+        .map((ev) => {
+          const meta = (ev.metadata || {}) as Record<string, unknown>;
+          return {
+            id: ev.id,
+            elderId: meta.elderId as string,
+            elderName: (meta.elderName as string) || 'Senior Member',
+            limitType: (meta.limitType as string) || 'DAILY',
+            requestedAmount: Number(meta.requestedAmount || 0),
+            currentDailyCap: Number(meta.currentDailyCap || 0),
+            currentMonthlyBudget: Number(meta.currentMonthlyBudget || 0),
+            reason: (meta.reason as string) || '',
+            status: 'PENDING',
+            createdAt: ev.createdAt.toISOString(),
+          };
+        });
 
       return NextResponse.json({
         role: 'CAREGIVER',
         user: session,
-        linkedElders: links.map((l) => ({
-          id: l.elder.id,
-          fullName: l.elder.fullName,
-          email: l.elder.email,
-          phoneNumber: l.elder.phoneNumber,
-          city: l.elder.city,
-          primaryZipCode: l.elder.primaryZipCode,
-          emergencyContactName: l.elder.emergencyContactName,
-          emergencyContactPhone: l.elder.emergencyContactPhone,
-          relationship: l.relationship,
-          permission: {
-            canView: l.permission?.canViewTransactions ?? true,
-            canApprove: l.permission?.canApprovePayments ?? false,
-            canManage: l.permission?.canManageSettings ?? false,
-          },
-          protectionSettings: l.elder.protectionSettings
-            ? {
-                familyApprovalThreshold: Number(l.elder.protectionSettings.familyApprovalThreshold.toString()),
-                absoluteDailyCap: Number(l.elder.protectionSettings.absoluteDailyCap.toString()),
-                absoluteTransactionCap: Number(l.elder.protectionSettings.absoluteTransactionCap.toString()),
-                monthlyBudget: l.elder.protectionSettings.monthlyBudget ? Number(l.elder.protectionSettings.monthlyBudget.toString()) : null,
-                requireFamilyForNewRecipient: l.elder.protectionSettings.requireFamilyForNewRecipient,
-                requireFamilyForUnusual: l.elder.protectionSettings.requireFamilyForUnusual,
-              }
-            : {
-                familyApprovalThreshold: 100,
-                absoluteDailyCap: 1000,
-                absoluteTransactionCap: 500,
-                monthlyBudget: 2000,
-                requireFamilyForNewRecipient: true,
-                requireFamilyForUnusual: true,
-              },
-          todaySpend: spendingByElder[l.elder.id] || 0,
-        })),
+        linkedElders: links.map((l) => {
+          const dailyCap = Number(l.elder.protectionSettings?.absoluteDailyCap?.toString() || 1000);
+          const monthlyBudget = Number(l.elder.protectionSettings?.monthlyBudget?.toString() || 2000);
+          const todaySpend = spendingByElder[l.elder.id] || 0;
+          const monthSpend = monthlySpendingByElder[l.elder.id] || 0;
+
+          return {
+            id: l.elder.id,
+            fullName: l.elder.fullName,
+            email: l.elder.email,
+            phoneNumber: l.elder.phoneNumber,
+            city: l.elder.city,
+            primaryZipCode: l.elder.primaryZipCode,
+            emergencyContactName: l.elder.emergencyContactName,
+            emergencyContactPhone: l.elder.emergencyContactPhone,
+            relationship: l.relationship,
+            permission: {
+              canView: l.permission?.canViewTransactions ?? true,
+              canApprove: l.permission?.canApprovePayments ?? false,
+              canManage: l.permission?.canManageSettings ?? false,
+            },
+            protectionSettings: l.elder.protectionSettings
+              ? {
+                  familyApprovalThreshold: Number(l.elder.protectionSettings.familyApprovalThreshold.toString()),
+                  absoluteDailyCap: dailyCap,
+                  absoluteTransactionCap: Number(l.elder.protectionSettings.absoluteTransactionCap.toString()),
+                  monthlyBudget,
+                  requireFamilyForNewRecipient: l.elder.protectionSettings.requireFamilyForNewRecipient,
+                  requireFamilyForUnusual: l.elder.protectionSettings.requireFamilyForUnusual,
+                }
+              : {
+                  familyApprovalThreshold: 100,
+                  absoluteDailyCap: 1000,
+                  absoluteTransactionCap: 500,
+                  monthlyBudget: 2000,
+                  requireFamilyForNewRecipient: true,
+                  requireFamilyForUnusual: true,
+                },
+            todaySpend,
+            monthSpend,
+            remainingDailyCap: Math.max(0, dailyCap - todaySpend),
+            remainingMonthlyBudget: Math.max(0, monthlyBudget - monthSpend),
+          };
+        }),
         pendingApprovalsCount: pendingApprovals.length,
         pendingApprovals: pendingApprovals.map((a) => ({
           id: a.id,
@@ -124,6 +185,7 @@ export async function GET(req: NextRequest) {
               })
             : null,
         })),
+        pendingLimitRequests,
       }, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -133,6 +195,13 @@ export async function GET(req: NextRequest) {
       });
     } else {
       // Current user is a PROTECTED_USER (Senior)
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
       const elder = await prisma.user.findUnique({
         where: { id: session.id },
         include: {
@@ -164,6 +233,15 @@ export async function GET(req: NextRequest) {
         _sum: { amount: true },
       });
 
+      const monthSum = await prisma.paymentRequest.aggregate({
+        where: {
+          elderId: session.id,
+          status: PaymentRequestStatus.SETTLED,
+          settledAt: { gte: startOfMonth },
+        },
+        _sum: { amount: true },
+      });
+
       const activeHolds = await prisma.paymentRequest.findMany({
         where: {
           elderId: session.id,
@@ -183,13 +261,49 @@ export async function GET(req: NextRequest) {
         take: 8,
       });
 
+      // Fetch pending limit increase requests for this senior
+      const seniorLimitEvents = await prisma.auditEvent.findMany({
+        where: {
+          eventType: 'LIMIT_INCREASE_REQUESTED',
+          oldState: 'PENDING',
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      });
+
+      const seniorPendingLimitRequests = seniorLimitEvents
+        .filter((ev) => {
+          const meta = ev.metadata as Record<string, unknown> | null;
+          return meta && meta.elderId === session.id;
+        })
+        .map((ev) => {
+          const meta = (ev.metadata || {}) as Record<string, unknown>;
+          return {
+            id: ev.id,
+            limitType: (meta.limitType as string) || 'DAILY',
+            requestedAmount: Number(meta.requestedAmount || 0),
+            reason: (meta.reason as string) || '',
+            status: 'PENDING',
+            createdAt: ev.createdAt.toISOString(),
+          };
+        });
+
+      const dailyCap = Number(elder?.protectionSettings?.absoluteDailyCap?.toString() || 1000);
+      const monthlyBudget = Number(elder?.protectionSettings?.monthlyBudget?.toString() || 2000);
+      const todaySpend = Number(todaySum._sum.amount?.toString() || 0);
+      const monthSpend = Number(monthSum._sum.amount?.toString() || 0);
+
       return NextResponse.json({
         role: 'PROTECTED_USER',
         user: session,
-        todaySpend: Number(todaySum._sum.amount?.toString() || 0),
-        dailyCap: Number(elder?.protectionSettings?.absoluteDailyCap?.toString() || 1000),
+        todaySpend,
+        monthSpend,
+        dailyCap,
+        monthlyBudget,
+        remainingDailyCap: Math.max(0, dailyCap - todaySpend),
+        remainingMonthlyBudget: Math.max(0, monthlyBudget - monthSpend),
+        pendingLimitRequests: seniorPendingLimitRequests,
         familyThreshold: Number(elder?.protectionSettings?.familyApprovalThreshold?.toString() || 100),
-        monthlyBudget: Number(elder?.protectionSettings?.monthlyBudget?.toString() || 2000),
         guardians: elder?.elderLinks
           ? elder.elderLinks.map((l) => ({
               id: l.caregiver.id,

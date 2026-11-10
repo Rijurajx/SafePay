@@ -20,6 +20,7 @@ export interface EvaluateRiskParams {
     absoluteTransactionCap: Decimal | number;
     absoluteDailyCap: Decimal | number;
     familyApprovalThreshold: Decimal | number;
+    monthlyBudget?: Decimal | number | null;
     requireFamilyForNewRecipient: boolean;
     requireFamilyForUnusual: boolean;
   };
@@ -31,7 +32,13 @@ export interface EvaluateRiskParams {
     usualEndHour: number;
   } | null;
   currentDailySpend?: number;
+  currentMonthlySpend?: number;
   recentTransactionsCount?: number;
+  recentTransactionsSameMerchant?: Array<{
+    amount: number;
+    createdAt: Date;
+    status: string;
+  }>;
   transactionTime?: Date;
 }
 
@@ -47,7 +54,9 @@ export function evaluateTransactionRisk(params: EvaluateRiskParams): Determinist
     protectionSettings,
     spendingBaseline,
     currentDailySpend = 0,
+    currentMonthlySpend = 0,
     recentTransactionsCount = 0,
+    recentTransactionsSameMerchant = [],
     transactionTime = new Date(),
   } = params;
 
@@ -55,6 +64,7 @@ export function evaluateTransactionRisk(params: EvaluateRiskParams): Determinist
   const absoluteTransactionCap = Number(protectionSettings.absoluteTransactionCap.toString());
   const absoluteDailyCap = Number(protectionSettings.absoluteDailyCap.toString());
   const familyApprovalThreshold = Number(protectionSettings.familyApprovalThreshold.toString());
+  const monthlyBudget = protectionSettings.monthlyBudget ? Number(protectionSettings.monthlyBudget.toString()) : null;
 
   const signals: RiskSignal[] = [];
   let riskScore = 0;
@@ -93,7 +103,53 @@ export function evaluateTransactionRisk(params: EvaluateRiskParams): Determinist
     });
   }
 
-  // 3. RULE: Family Approval Threshold
+  // 3. RULE: Monthly Budget Cap
+  if (monthlyBudget && monthlyBudget > 0) {
+    const totalMonthlyWithCurrent = currentMonthlySpend + amount;
+    if (totalMonthlyWithCurrent > monthlyBudget) {
+      hasPolicyViolation = true;
+      requiresFamilyApproval = true;
+      riskScore += 40;
+      const msg = `Monthly total ($${totalMonthlyWithCurrent.toFixed(2)}) exceeds monthly spending budget ($${monthlyBudget.toFixed(2)})`;
+      if (!blockingReason) blockingReason = msg;
+      signals.push({
+        code: 'EXCEEDS_MONTHLY_BUDGET',
+        severity: 'HIGH',
+        message: msg,
+        metadata: { currentMonthlySpend, amount, totalMonthlyWithCurrent, monthlyBudget },
+      });
+    }
+  }
+
+  // 4. RULE: Suspected Duplicate Payment Anomaly Check
+  // If the senior attempts an identical charge to the same merchant within 24h, flag and hold
+  const duplicateMatch = recentTransactionsSameMerchant.find((t) => {
+    const isSameAmount = Math.abs(t.amount - amount) < 0.01;
+    return isSameAmount;
+  });
+
+  if (duplicateMatch) {
+    requiresFamilyApproval = true;
+    hasUnusualSignal = true;
+    riskScore += 40;
+    const diffMins = Math.max(1, Math.round((transactionTime.getTime() - new Date(duplicateMatch.createdAt).getTime()) / (60 * 1000)));
+    const timeDesc = diffMins < 60 ? `${diffMins}m ago` : `${Math.round(diffMins / 60)}h ago`;
+    const dupMsg = `Potential duplicate charge detected: An identical payment of $${amount.toFixed(2)} to "${recipient.merchantName}" was initiated ${timeDesc}. Held for family approval to prevent accidental double-billing.`;
+    if (!blockingReason) blockingReason = dupMsg;
+    signals.push({
+      code: 'DUPLICATE_PAYMENT_SUSPECTED',
+      severity: 'HIGH',
+      message: dupMsg,
+      metadata: {
+        amount,
+        merchantName: recipient.merchantName,
+        previousTransactionTime: duplicateMatch.createdAt,
+        previousStatus: duplicateMatch.status,
+      },
+    });
+  }
+
+  // 5. RULE: Family Approval Threshold
   if (amount > familyApprovalThreshold) {
     requiresFamilyApproval = true;
     hasUnusualSignal = true;
@@ -106,7 +162,7 @@ export function evaluateTransactionRisk(params: EvaluateRiskParams): Determinist
     });
   }
 
-  // 4. RULE: Recipient Familiarity & Trust
+  // 6. RULE: Recipient Familiarity & Trust
   const isFirstTimeMerchant = !recipient.isTrusted && !recipient.lastPaidAt;
   if (isFirstTimeMerchant && protectionSettings.requireFamilyForNewRecipient) {
     requiresFamilyApproval = true;

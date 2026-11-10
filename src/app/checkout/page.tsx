@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import {
   ShieldCheck,
   ExternalLink,
@@ -47,6 +47,15 @@ const PRESET_SCENARIOS: PresetItem[] = [
     badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
   },
   {
+    id: 'duplicate_groceries',
+    merchantName: 'Corner Market & Produce',
+    category: 'Groceries',
+    amount: 28.50,
+    description: 'Duplicate charge: Exact same $28.50 at Corner Market (Triggers hold).',
+    expectedResult: 'HOLD',
+    badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
+  },
+  {
     id: 'electronics',
     merchantName: 'TechGadget Online',
     category: 'Electronics',
@@ -73,12 +82,10 @@ interface LinkedElderOption {
 }
 
 function CheckoutContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
   const [linkedElders, setLinkedElders] = useState<LinkedElderOption[]>([]);
   const [selectedElderId, setSelectedElderId] = useState<string>('');
-  const [linkedCaregiverId, setLinkedCaregiverId] = useState<string | null>(null);
 
   // Selected cart preset
   const [selectedPresetId, setSelectedPresetId] = useState<string>('pharmacy');
@@ -96,6 +103,42 @@ function CheckoutContent() {
     paypalUrl?: string | null;
     paypalOrderId?: string | null;
   } | null>(null);
+
+  // Limit Request Modal states
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitType, setLimitType] = useState<'DAILY' | 'MONTHLY'>('DAILY');
+  const [limitAmount, setLimitAmount] = useState('100');
+  const [limitReason, setLimitReason] = useState('');
+  const [submittingLimit, setSubmittingLimit] = useState(false);
+  const [limitSuccessMsg, setLimitSuccessMsg] = useState<string | null>(null);
+
+  const handleRequestLimit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmittingLimit(true);
+    try {
+      const res = await fetch('/api/family/limit-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          limitType,
+          requestedAmount: Number(limitAmount),
+          reason: limitReason,
+          elderId: selectedElderId || currentUser?.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to submit limit request');
+      setLimitSuccessMsg(`Request for +$${limitAmount} sent to family caregivers!`);
+      setTimeout(() => {
+        setShowLimitModal(false);
+        setLimitSuccessMsg(null);
+      }, 3000);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error submitting request');
+    } finally {
+      setSubmittingLimit(false);
+    }
+  };
 
   const loadSession = useCallback(async () => {
     try {
@@ -122,10 +165,6 @@ function CheckoutContent() {
           }
         } else {
           // Protected Senior
-          const primaryCaregiver = data.elderLinks?.[0]?.caregiver;
-          if (primaryCaregiver) {
-            setLinkedCaregiverId(primaryCaregiver.id);
-          }
           setSelectedElderId(data.user.id);
         }
       } else {
@@ -229,23 +268,6 @@ function CheckoutContent() {
     } finally {
       setEvaluating(false);
       setEvalStep('');
-    }
-  };
-
-  const handleSwitchToCaregiverAndReview = async () => {
-    try {
-      if (currentUser?.roleDefault === 'PROTECTED_USER' && linkedCaregiverId) {
-        // Switch to the linked caregiver
-        await fetch('/api/auth/switch-family', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetUserId: linkedCaregiverId }),
-        });
-      }
-      router.push('/dashboard');
-    } catch (e) {
-      console.error(e);
-      router.push('/dashboard');
     }
   };
 
@@ -507,26 +529,162 @@ function CheckoutContent() {
                     </div>
                   )}
 
-                  {/* Call to Action: Switch to Caregiver Dashboard & Approve */}
-                  <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
-                    <button
-                      onClick={handleSwitchToCaregiverAndReview}
-                      className="w-full sm:w-auto flex-1 py-3.5 px-6 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold text-center flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                      <span>Review & Approve on Guardian Dashboard &rarr;</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEvalResult(null);
-                      }}
-                      className="w-full sm:w-auto py-3 px-5 rounded-full text-xs font-semibold text-slate-700 hover:bg-black/5 transition-all"
-                    >
-                      Reset Scenario
-                    </button>
+                  {/* Protected Security Gate: Elder cannot approve their own holds */}
+                  <div className="pt-2 flex flex-col gap-3">
+                    <div className="p-4 rounded-xl bg-purple-50/90 border border-purple-200 text-xs text-purple-950 flex items-start gap-3">
+                      <Clock className="w-5 h-5 text-purple-600 shrink-0 mt-0.5 animate-pulse" />
+                      <div className="space-y-1">
+                        <p className="font-bold text-purple-900">Waiting for Family Caregiver Review</p>
+                        <p className="text-purple-800/90 leading-relaxed">
+                          Your family caregivers have been notified to review this payment. Protected senior accounts cannot approve payments. Please wait while your family confirms, or submit a limit increase request if needed.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowLimitModal(true)}
+                        className="w-full sm:w-auto flex-1 py-3 px-5 rounded-full bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold text-center flex items-center justify-center gap-2 shadow-sm transition-all"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-purple-200" />
+                        <span>Request Limit Increase from Guardian</span>
+                      </button>
+
+                      <Link
+                        href={currentUser?.roleDefault === 'PROTECTED_USER' ? '/elder' : '/dashboard'}
+                        className="w-full sm:w-auto py-3 px-5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold text-center transition-all"
+                      >
+                        Return to Dashboard
+                      </Link>
+
+                      <button
+                        type="button"
+                        onClick={() => setEvalResult(null)}
+                        className="w-full sm:w-auto py-3 px-4 rounded-full text-xs font-semibold text-slate-700 hover:bg-black/5 transition-all"
+                      >
+                        Reset Cart
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* LIMIT INCREASE REQUEST MODAL */}
+          {showLimitModal && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm">
+                      $
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Request Limit Increase</h3>
+                      <p className="text-[11px] text-slate-500">Ask your caregiver for additional spending allowance</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowLimitModal(false)}
+                    className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1"
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                {limitSuccessMsg ? (
+                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold text-center space-y-1">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto" />
+                    <p>{limitSuccessMsg}</p>
+                  </div>
+                ) : (
+                  <form onSubmit={handleRequestLimit} className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Limit to Increase</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setLimitType('DAILY')}
+                          className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                            limitType === 'DAILY'
+                              ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          Daily Spending Cap
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLimitType('MONTHLY')}
+                          className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                            limitType === 'MONTHLY'
+                              ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          Monthly Budget
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Requested Additional Amount ($ USD)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                        <input
+                          type="number"
+                          step="10"
+                          min="10"
+                          max="2000"
+                          required
+                          value={limitAmount}
+                          onChange={(e) => setLimitAmount(e.target.value)}
+                          className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          placeholder="100"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Reason for Caregiver (Optional)
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={limitReason}
+                        onChange={(e) => setLimitReason(e.target.value)}
+                        placeholder="e.g., Grocery shopping, medicine refill, home repair"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowLimitModal(false)}
+                        className="flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={submittingLimit}
+                        className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white transition-all shadow-sm flex items-center justify-center gap-1.5"
+                      >
+                        {submittingLimit ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <span>Submit Request</span>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
             </div>
           )}
         </div>

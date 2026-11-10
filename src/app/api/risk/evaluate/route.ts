@@ -159,6 +159,54 @@ export async function POST(req: NextRequest) {
       Number(todaySettled._sum.amount?.toString() || 0) +
       Number(todayReservations._sum.amount?.toString() || 0);
 
+    // Calculate current monthly spend
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const monthSettled = await prisma.paymentRequest.aggregate({
+      where: {
+        elderId,
+        status: PaymentRequestStatus.SETTLED,
+        settledAt: { gte: startOfMonth },
+      },
+      _sum: { amount: true },
+    });
+    const currentMonthlySpend = Number(monthSettled._sum.amount?.toString() || 0);
+
+    // Query recent transactions to the same merchant within last 24h for duplicate anomaly detection
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentSameMerchantRecords = await prisma.paymentRequest.findMany({
+      where: {
+        elderId,
+        recipientId: recipient.id,
+        id: { not: targetPaymentRequest.id },
+        createdAt: { gte: twentyFourHoursAgo },
+        status: {
+          in: [
+            PaymentRequestStatus.SETTLED,
+            PaymentRequestStatus.AWAITING_FAMILY,
+            PaymentRequestStatus.READY_FOR_CHECKOUT,
+            PaymentRequestStatus.CHECKOUT_IN_PROGRESS,
+            PaymentRequestStatus.INITIATED,
+          ],
+        },
+      },
+      select: {
+        amount: true,
+        createdAt: true,
+        status: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    const recentTransactionsSameMerchant = recentSameMerchantRecords.map((r) => ({
+      amount: Number(r.amount.toString()),
+      createdAt: r.createdAt,
+      status: r.status,
+    }));
+
     // Calculate transaction velocity in last 15 minutes
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const recentTransactionsCount = await prisma.paymentRequest.count({
@@ -176,7 +224,9 @@ export async function POST(req: NextRequest) {
       protectionSettings,
       spendingBaseline: latestBaseline,
       currentDailySpend,
+      currentMonthlySpend,
       recentTransactionsCount,
+      recentTransactionsSameMerchant,
       transactionTime: inputTransactionTime ? new Date(inputTransactionTime) : new Date(),
     });
 

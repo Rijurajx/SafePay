@@ -12,8 +12,6 @@ import {
   AlertCircle,
   ArrowRight,
   Sparkles,
-  Copy,
-  Check,
   RefreshCw,
   Phone,
   Bell,
@@ -54,9 +52,8 @@ export default function OnboardingPage() {
   // Success state with generated invite
   const [createdInvite, setCreatedInvite] = useState<{
     elderName: string;
-    inviteLink: string;
+    elderEmail: string;
   } | null>(null);
-  const [copied, setCopied] = useState(false);
 
   // Load current authenticated user session
   useEffect(() => {
@@ -127,10 +124,10 @@ export default function OnboardingPage() {
         return;
       }
 
-      if (data.inviteLink) {
+      if (data.elderName || data.elderEmail) {
         setCreatedInvite({
-          elderName: elderFullName.trim(),
-          inviteLink: data.inviteLink,
+          elderName: data.elderName || elderFullName.trim(),
+          elderEmail: data.elderEmail || elderEmailOrPhone.trim().toLowerCase(),
         });
       } else {
         // Direct to dashboard immediately
@@ -141,13 +138,6 @@ export default function OnboardingPage() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const copyToClipboard = () => {
-    if (!createdInvite?.inviteLink) return;
-    navigator.clipboard.writeText(createdInvite.inviteLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
   };
 
   if (loading) {
@@ -584,38 +574,22 @@ export default function OnboardingPage() {
               <div className="flex items-center justify-between text-xs font-semibold text-purple-900">
                 <span className="flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                  Senior Invitation Link:
+                  Invitation Dispatched Directly
                 </span>
-                <span className="text-[10px] text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full font-bold">
-                  Single-Use Secure Token
+                <span className="text-[10px] text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full font-bold">
+                  Sent to Senior&apos;s Inbox
                 </span>
               </div>
-              <p className="text-[11px] text-slate-600">
-                Send this link to {createdInvite.elderName}. Once they accept, your oversight shield will immediately be active:
+              <p className="text-[11px] text-slate-700 leading-relaxed">
+                SafePay has dispatched a secure single-use invitation link directly to{' '}
+                <strong className="text-slate-900 font-mono">{createdInvite.elderEmail}</strong>.
               </p>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={createdInvite.inviteLink}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-mono text-slate-800 outline-none select-all"
-                />
-                <button
-                  onClick={copyToClipboard}
-                  className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shrink-0 flex items-center gap-1 transition-all active:scale-95"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
+              <div className="p-3 bg-purple-50/70 rounded-xl border border-purple-100 text-[11px] text-purple-900 space-y-1">
+                <span className="font-bold block">🔒 Privacy &amp; Senior Consent Protected</span>
+                <p className="text-purple-800 text-[10px] leading-relaxed">
+                  For security and elder autonomy, the invite link is never displayed in the caregiver portal.
+                  {' '}{createdInvite.elderName} must open and confirm the invitation from their private email inbox.
+                </p>
               </div>
             </div>
 

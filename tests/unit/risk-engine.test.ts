@@ -169,5 +169,77 @@ describe('Milestone 2: Deterministic Risk Engine Unit Tests', () => {
 
     expect(result.signals.some((s) => s.code === 'RAPID_SPENDING_VELOCITY')).toBe(true);
   });
+
+  it('detects duplicate payment to same merchant even when under daily cap and holds for caregiver', () => {
+    // Senior makes a $56 payment to X Shop, which is under their $1000 daily cap
+    const result = evaluateTransactionRisk({
+      amount: 56.0,
+      elderId: 'elder-1',
+      recipient: trustedMerchant,
+      protectionSettings: defaultProtectionSettings,
+      spendingBaseline: defaultBaseline,
+      currentDailySpend: 56.0, // already made 1 payment today
+      recentTransactionsSameMerchant: [
+        {
+          amount: 56.0,
+          createdAt: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+          status: 'SETTLED',
+        },
+      ],
+      transactionTime: new Date(2026, 10, 7, 14, 30),
+    });
+
+    expect(result.requiresFamilyApproval).toBe(true);
+    expect(result.status).toBe(PaymentRequestStatus.AWAITING_FAMILY);
+    expect(result.signals.some((s) => s.code === 'DUPLICATE_PAYMENT_SUSPECTED')).toBe(true);
+    const signal = result.signals.find((s) => s.code === 'DUPLICATE_PAYMENT_SUSPECTED');
+    expect(signal?.severity).toBe('HIGH');
+    expect(signal?.message).toContain('Potential duplicate charge detected');
+  });
+
+  it('holds transaction when total spend exceeds monthly budget', () => {
+    const result = evaluateTransactionRisk({
+      amount: 60.0,
+      elderId: 'elder-1',
+      recipient: trustedMerchant,
+      protectionSettings: {
+        ...defaultProtectionSettings,
+        monthlyBudget: 1000.0,
+      },
+      spendingBaseline: defaultBaseline,
+      currentDailySpend: 0,
+      currentMonthlySpend: 960.0, // 960 + 60 = 1020 > 1000
+      transactionTime: new Date(2026, 10, 7, 14, 0),
+    });
+
+    expect(result.requiresFamilyApproval).toBe(true);
+    expect(result.signals.some((s) => s.code === 'EXCEEDS_MONTHLY_BUDGET')).toBe(true);
+    const signal = result.signals.find((s) => s.code === 'EXCEEDS_MONTHLY_BUDGET');
+    expect(signal?.severity).toBe('HIGH');
+  });
+
+  it('allows seamless checkout when payment is under remaining daily cap and not a duplicate', () => {
+    // Remaining daily cap = 1000 - 150 = 850. Amount = 40. No duplicate transactions.
+    const result = evaluateTransactionRisk({
+      amount: 40.0,
+      elderId: 'elder-1',
+      recipient: trustedMerchant,
+      protectionSettings: defaultProtectionSettings,
+      spendingBaseline: defaultBaseline,
+      currentDailySpend: 150.0,
+      recentTransactionsSameMerchant: [
+        {
+          amount: 95.0, // different amount
+          createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+          status: 'SETTLED',
+        },
+      ],
+      transactionTime: new Date(2026, 10, 7, 14, 0),
+    });
+
+    expect(result.requiresFamilyApproval).toBe(false);
+    expect(result.status).toBe(PaymentRequestStatus.READY_FOR_CHECKOUT);
+    expect(result.classification).toBe(RiskClassification.NORMAL);
+  });
 });
 

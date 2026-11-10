@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
 import { createInvitationToken } from '@/lib/auth-tokens';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { Role, FamilyLinkStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -161,14 +162,27 @@ export async function POST(req: NextRequest) {
     }
 
     const host = req.headers.get('host') || 'localhost:3000';
-    const protocol = req.headers.get('x-forwarded-proto') || 'http';
+    const protocol = req.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
     const inviteLink = `${protocol}://${host}/invite/accept?token=${encodeURIComponent(inviteToken)}`;
+
+    // Dispatch invitation directly to senior's email
+    try {
+      const adminSb = createAdminClient();
+      await adminSb.auth.admin.inviteUserByEmail(normalizedContact, {
+        redirectTo: inviteLink,
+        data: {
+          role: 'PROTECTED_USER',
+          caregiverName: session.fullName,
+          elderFullName: trimmedName,
+        },
+      });
+    } catch (emailErr) {
+      console.warn('Direct invite email dispatch note:', emailErr);
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Invitation issued for ${trimmedName}. Awaiting their consent.`,
-      inviteLink,
-      inviteToken,
+      message: `Invitation dispatched directly to ${normalizedContact}. For security, only ${trimmedName} can review and accept it from their private email.`,
       invitation: {
         elderId: elder.id,
         elderFullName: trimmedName,
@@ -178,6 +192,7 @@ export async function POST(req: NextRequest) {
         dailyCap: Number(dailyCap) || 1000,
         status: 'PENDING_APPROVAL',
       },
+      // inviteLink is INTENTIONALLY omitted so caregivers cannot copy and self-accept
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal error creating senior invitation';
