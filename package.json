@@ -10,6 +10,7 @@
     "test": "vitest run --fileParallelism=false",
     "demo": "tsx scripts/test-demo.ts",
     "prisma:seed": "npx tsx prisma/seed.ts",
+    "db:wipe": "tsx scripts/wipe-db.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {
