@@ -57,6 +57,14 @@ export default function HomePage() {
   };
 
   useEffect(() => {
+    // If Supabase OAuth or Email redirect lands on root / with an auth code, forward to /auth/callback
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('code') || params.get('token_hash')) {
+        window.location.replace(`/auth/callback${window.location.search}`);
+        return;
+      }
+    }
     refreshSession();
   }, []);
 
