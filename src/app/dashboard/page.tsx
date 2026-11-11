@@ -1055,14 +1055,14 @@ export default function DashboardPage() {
 
           {/* Top Brand & Shield Status */}
           <div>
-            <div className="h-16 border-b border-slate-100 flex items-center px-4 overflow-hidden">
+            <div className={`h-16 border-b border-slate-100 flex items-center overflow-hidden transition-all duration-300 ${seniorSidebarCollapsed ? 'justify-center px-0' : 'px-4'}`}>
               <Link href="/" className="flex items-center gap-2.5 min-w-0 group" title="SafePay - Senior Shield">
                 <div className="w-9 h-9 rounded-2xl bg-slate-950 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
                   <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
                 </div>
                 <div
                   className={`flex flex-col overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                    seniorSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[170px] opacity-100'
+                    seniorSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none ml-0' : 'max-w-[170px] opacity-100'
                   }`}
                 >
                   <span className="font-bold tracking-tight text-sm text-slate-950 leading-tight">SafePay</span>
@@ -1081,7 +1081,11 @@ export default function DashboardPage() {
                   setSeniorTab('profile');
                   setSeniorMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition-colors duration-200 relative group overflow-hidden ${
+                className={`flex items-center rounded-2xl font-semibold text-xs transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] relative group overflow-hidden ${
+                  seniorSidebarCollapsed
+                    ? 'w-11 h-11 mx-auto justify-center px-0'
+                    : 'w-full h-11 px-3.5 justify-start'
+                } ${
                   seniorTab === 'profile'
                     ? 'bg-slate-950 text-white shadow-md shadow-slate-950/10'
                     : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/80'
@@ -1092,8 +1096,8 @@ export default function DashboardPage() {
                   <User className={`w-4 h-4 ${seniorTab === 'profile' ? 'text-emerald-400' : 'text-slate-500'}`} />
                 </div>
                 <div
-                  className={`ml-2.5 flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                    seniorSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[170px] opacity-100'
+                  className={`flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                    seniorSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none ml-0' : 'max-w-[170px] opacity-100 ml-2.5'
                   }`}
                 >
                   <span className="truncate">My Profile</span>
@@ -1109,7 +1113,11 @@ export default function DashboardPage() {
                   setSeniorTab('ledger');
                   setSeniorMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition-colors duration-200 relative group overflow-hidden ${
+                className={`flex items-center rounded-2xl font-semibold text-xs transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] relative group overflow-hidden ${
+                  seniorSidebarCollapsed
+                    ? 'w-11 h-11 mx-auto justify-center px-0'
+                    : 'w-full h-11 px-3.5 justify-start'
+                } ${
                   seniorTab === 'ledger'
                     ? 'bg-slate-950 text-white shadow-md shadow-slate-950/10'
                     : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/80'
@@ -1120,8 +1128,8 @@ export default function DashboardPage() {
                   <ReceiptText className={`w-4 h-4 ${seniorTab === 'ledger' ? 'text-purple-400' : 'text-slate-500'}`} />
                 </div>
                 <div
-                  className={`ml-2.5 flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                    seniorSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[170px] opacity-100'
+                  className={`flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                    seniorSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none ml-0' : 'max-w-[170px] opacity-100 ml-2.5'
                   }`}
                 >
                   <span className="truncate">Ledger</span>
@@ -1136,7 +1144,7 @@ export default function DashboardPage() {
                   )}
                 </div>
                 {seniorSidebarCollapsed && seniorHolds.length > 0 && (
-                  <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white animate-pulse" />
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white animate-pulse" />
                 )}
               </button>
             </nav>
@@ -1144,13 +1152,19 @@ export default function DashboardPage() {
 
           {/* Bottom Senior Profile Card & Sign Out */}
           <div className="p-3 border-t border-slate-100 space-y-2 overflow-hidden">
-            <div className="p-2 rounded-2xl bg-white/90 border border-slate-200/80 shadow-2xs flex items-center overflow-hidden">
+            <div
+              className={`flex items-center rounded-2xl bg-white/90 border border-slate-200/80 shadow-2xs overflow-hidden transition-all duration-300 ${
+                seniorSidebarCollapsed
+                  ? 'w-11 h-11 mx-auto justify-center p-0'
+                  : 'w-full p-2 justify-start'
+              }`}
+            >
               <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
                 {currentUser?.fullName?.charAt(0) || 'T'}
               </div>
               <div
-                className={`ml-2.5 flex-1 min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                  seniorSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[150px] opacity-100'
+                className={`flex-1 min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                  seniorSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none ml-0' : 'max-w-[150px] opacity-100 ml-2.5'
                 }`}
               >
                 <p className="text-xs font-bold text-slate-900 truncate">{currentUser?.fullName || 'Senior'}</p>
@@ -1162,7 +1176,11 @@ export default function DashboardPage() {
 
             <button
               onClick={handleLogout}
-              className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 text-xs font-semibold transition-colors flex items-center justify-center overflow-hidden"
+              className={`rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 text-xs font-semibold transition-colors flex items-center justify-center overflow-hidden ${
+                seniorSidebarCollapsed
+                  ? 'w-11 h-11 mx-auto p-0'
+                  : 'w-full py-2 px-3'
+              }`}
               title="Sign Out"
             >
               <div className="w-4 h-4 flex items-center justify-center shrink-0">
@@ -2104,14 +2122,14 @@ export default function DashboardPage() {
         </button>
 
         {/* Top Header & Brand */}
-        <div className="h-16 border-b border-slate-200/60 flex items-center px-4 overflow-hidden">
+        <div className={`h-16 border-b border-slate-200/60 flex items-center overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'justify-center px-0' : 'px-4'}`}>
           <Link href="/" className="flex items-center gap-2.5 min-w-0 group" title="SafePay - Caregiver Shield">
             <div className="w-9 h-9 rounded-2xl bg-slate-950 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
               <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
             </div>
             <div
               className={`flex flex-col overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[170px] opacity-100'
+                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none ml-0' : 'max-w-[170px] opacity-100'
               }`}
             >
               <span className="font-bold tracking-tight text-sm text-slate-950 leading-tight">SafePay</span>
@@ -2125,7 +2143,11 @@ export default function DashboardPage() {
           {/* Nav Item: Overview */}
           <button
             onClick={() => setActiveTab('overview')}
-            className={`w-full flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition-colors duration-200 relative group overflow-hidden ${
+            className={`flex items-center rounded-2xl font-semibold text-xs transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] relative group overflow-hidden ${
+              isSidebarCollapsed
+                ? 'w-11 h-11 mx-auto justify-center px-0'
+                : 'w-full h-11 px-3.5 justify-start'
+            } ${
               activeTab === 'overview'
                 ? 'bg-slate-950 text-white shadow-md shadow-slate-950/10'
                 : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/80'
@@ -2136,8 +2158,8 @@ export default function DashboardPage() {
               <LayoutDashboard className={`w-4 h-4 ${activeTab === 'overview' ? 'text-purple-400' : 'text-slate-500'}`} />
             </div>
             <div
-              className={`ml-2.5 flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[170px] opacity-100'
+              className={`flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none ml-0' : 'max-w-[170px] opacity-100 ml-2.5'
               }`}
             >
               <span className="truncate">Overview</span>
@@ -2148,14 +2170,18 @@ export default function DashboardPage() {
               )}
             </div>
             {isSidebarCollapsed && pendingApprovals.length > 0 && (
-              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white animate-pulse" />
+              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white animate-pulse" />
             )}
           </button>
 
           {/* Nav Item: Elder Profiles */}
           <button
             onClick={() => setActiveTab('elders')}
-            className={`w-full flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition-colors duration-200 relative group overflow-hidden ${
+            className={`flex items-center rounded-2xl font-semibold text-xs transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] relative group overflow-hidden ${
+              isSidebarCollapsed
+                ? 'w-11 h-11 mx-auto justify-center px-0'
+                : 'w-full h-11 px-3.5 justify-start'
+            } ${
               activeTab === 'elders'
                 ? 'bg-slate-950 text-white shadow-md shadow-slate-950/10'
                 : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/80'
@@ -2166,8 +2192,8 @@ export default function DashboardPage() {
               <Users className={`w-4 h-4 ${activeTab === 'elders' ? 'text-emerald-400' : 'text-slate-500'}`} />
             </div>
             <div
-              className={`ml-2.5 flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[170px] opacity-100'
+              className={`flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none ml-0' : 'max-w-[170px] opacity-100 ml-2.5'
               }`}
             >
               <span className="truncate">Elder Profiles</span>
@@ -2180,7 +2206,11 @@ export default function DashboardPage() {
           {/* Nav Item: AI Assistant Chat */}
           <button
             onClick={() => setActiveTab('ai-chat')}
-            className={`w-full flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition-colors duration-200 relative group overflow-hidden ${
+            className={`flex items-center rounded-2xl font-semibold text-xs transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] relative group overflow-hidden ${
+              isSidebarCollapsed
+                ? 'w-11 h-11 mx-auto justify-center px-0'
+                : 'w-full h-11 px-3.5 justify-start'
+            } ${
               activeTab === 'ai-chat'
                 ? 'bg-slate-950 text-white shadow-md shadow-slate-950/10'
                 : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/80'
@@ -2191,8 +2221,8 @@ export default function DashboardPage() {
               <Bot className={`w-4 h-4 ${activeTab === 'ai-chat' ? 'text-purple-400' : 'text-slate-500'}`} />
             </div>
             <div
-              className={`ml-2.5 flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[170px] opacity-100'
+              className={`flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none ml-0' : 'max-w-[170px] opacity-100 ml-2.5'
               }`}
             >
               <span className="truncate">AI Assistant Chat</span>
@@ -2201,14 +2231,18 @@ export default function DashboardPage() {
               )}
             </div>
             {isSidebarCollapsed && pendingApprovals.length > 0 && (
-              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
             )}
           </button>
 
           {/* Nav Item: My Profile */}
           <button
             onClick={() => setActiveTab('profile')}
-            className={`w-full flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition-colors duration-200 relative group overflow-hidden ${
+            className={`flex items-center rounded-2xl font-semibold text-xs transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] relative group overflow-hidden ${
+              isSidebarCollapsed
+                ? 'w-11 h-11 mx-auto justify-center px-0'
+                : 'w-full h-11 px-3.5 justify-start'
+            } ${
               activeTab === 'profile'
                 ? 'bg-slate-950 text-white shadow-md shadow-slate-950/10'
                 : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/80'
@@ -2219,8 +2253,8 @@ export default function DashboardPage() {
               <User className={`w-4 h-4 ${activeTab === 'profile' ? 'text-purple-400' : 'text-slate-500'}`} />
             </div>
             <div
-              className={`ml-2.5 flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[170px] opacity-100'
+              className={`flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none ml-0' : 'max-w-[170px] opacity-100 ml-2.5'
               }`}
             >
               <span className="truncate">My Profile</span>
@@ -2259,7 +2293,11 @@ export default function DashboardPage() {
                         setSelectedElderId(elder.id);
                         if (activeTab === 'overview') setActiveTab('elders');
                       }}
-                      className={`w-full flex items-center px-2 py-1.5 rounded-xl text-xs font-medium transition-all group overflow-hidden ${
+                      className={`flex items-center rounded-xl text-xs font-medium transition-all group overflow-hidden ${
+                        isSidebarCollapsed
+                          ? 'w-9 h-9 mx-auto justify-center px-0'
+                          : 'w-full px-2 py-1.5 justify-start'
+                      } ${
                         isSelected
                           ? 'bg-purple-100/80 text-purple-950 font-bold'
                           : 'text-slate-600 hover:bg-slate-100'
@@ -2276,8 +2314,8 @@ export default function DashboardPage() {
                         {elder.fullName.charAt(0)}
                       </div>
                       <div
-                        className={`ml-2 flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                          isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[160px] opacity-100'
+                        className={`flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                          isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none ml-0' : 'max-w-[160px] opacity-100 ml-2'
                         }`}
                       >
                         <span className="truncate">{elder.fullName}</span>
@@ -2286,7 +2324,7 @@ export default function DashboardPage() {
                         )}
                       </div>
                       {isSidebarCollapsed && hasHold && (
-                        <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 ring-1 ring-white animate-pulse" />
+                        <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-amber-500 ring-1 ring-white animate-pulse" />
                       )}
                     </button>
                   );
@@ -2301,7 +2339,11 @@ export default function DashboardPage() {
           {/* Connect Elder Button */}
           <button
             onClick={() => setIsConnectModalOpen(true)}
-            className="w-full flex items-center px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200/70 text-xs font-semibold transition-all active:scale-95 overflow-hidden"
+            className={`flex items-center rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200/70 text-xs font-semibold transition-all active:scale-95 overflow-hidden ${
+              isSidebarCollapsed
+                ? 'w-11 h-11 mx-auto justify-center px-0'
+                : 'w-full py-2 px-3 justify-start'
+            }`}
             title="Invite Senior Member"
           >
             <div className="w-5 h-5 flex items-center justify-center shrink-0">
@@ -2317,7 +2359,13 @@ export default function DashboardPage() {
           </button>
 
           {/* User Profile Mini Bar */}
-          <div className="flex items-center p-2 rounded-xl bg-slate-50/80 border border-slate-200/50 overflow-hidden">
+          <div
+            className={`flex items-center rounded-xl bg-slate-50/80 border border-slate-200/50 overflow-hidden transition-all duration-300 ${
+              isSidebarCollapsed
+                ? 'w-11 h-11 mx-auto justify-center p-0'
+                : 'w-full p-2 justify-between'
+            }`}
+          >
             <div
               className="w-8 h-8 rounded-full bg-purple-700 text-white flex items-center justify-center font-bold text-xs shrink-0"
               title={`${currentUser?.fullName || 'Caregiver'} (${currentUser?.email || ''})`}
@@ -2345,7 +2393,7 @@ export default function DashboardPage() {
           {isSidebarCollapsed && (
             <button
               onClick={handleLogout}
-              className="w-full py-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl flex items-center justify-center transition-colors"
+              className="w-11 h-11 mx-auto text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl flex items-center justify-center transition-colors"
               title="Sign Out"
             >
               <LogOut className="w-4 h-4" />
@@ -3176,7 +3224,11 @@ export default function DashboardPage() {
                           <button
                             key={elder.id}
                             onClick={() => setSelectedElderId(elder.id)}
-                            className={`w-full text-left p-2 rounded-2xl flex items-center cursor-pointer transition-all border ${
+                            className={`flex items-center cursor-pointer transition-all border ${
+                              isElderChatSidebarCollapsed
+                                ? 'w-11 h-11 mx-auto justify-center p-0 rounded-2xl'
+                                : 'w-full text-left p-2 rounded-2xl'
+                            } ${
                               isSelected
                                 ? chatDark
                                   ? 'bg-purple-600/20 border-purple-500/40 text-white shadow-xs'
@@ -3191,8 +3243,8 @@ export default function DashboardPage() {
                               {elder.fullName.charAt(0)}
                             </div>
                             <div
-                              className={`ml-2.5 flex-1 min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                                isElderChatSidebarCollapsed ? 'opacity-0 max-w-0 pointer-events-none' : 'opacity-100 max-w-[180px]'
+                              className={`flex-1 min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                                isElderChatSidebarCollapsed ? 'opacity-0 max-w-0 pointer-events-none ml-0' : 'opacity-100 max-w-[180px] ml-2.5'
                               }`}
                             >
                               <div className="flex items-center justify-between">
