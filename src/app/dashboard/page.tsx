@@ -28,7 +28,6 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronLeft,
-  ChevronRight,
   Search,
   Send,
   ArrowRight,
@@ -1047,59 +1046,61 @@ export default function DashboardPage() {
             className="hidden md:flex absolute -right-3 top-5 w-6 h-6 rounded-full bg-white border border-slate-200/90 shadow-md items-center justify-center text-slate-500 hover:text-slate-950 hover:scale-110 active:scale-95 transition-all z-40"
             title={seniorSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           >
-            {seniorSidebarCollapsed ? (
-              <ChevronRight className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronLeft className="w-3.5 h-3.5" />
-            )}
+            <ChevronLeft
+              className={`w-3.5 h-3.5 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                seniorSidebarCollapsed ? 'rotate-180' : 'rotate-0'
+              }`}
+            />
           </button>
 
           {/* Top Brand & Shield Status */}
           <div>
-            <div className={`border-b border-slate-100 transition-all ${seniorSidebarCollapsed ? 'p-3 flex justify-center' : 'p-4'}`}>
-              <Link href="/" className="flex items-center gap-2.5 overflow-hidden group">
+            <div className="h-16 border-b border-slate-100 flex items-center px-4 overflow-hidden">
+              <Link href="/" className="flex items-center gap-2.5 min-w-0 group" title="SafePay - Senior Shield">
                 <div className="w-9 h-9 rounded-2xl bg-slate-950 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
                   <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
                 </div>
-                {!seniorSidebarCollapsed && (
-                  <div className="flex flex-col overflow-hidden whitespace-nowrap">
-                    <span className="font-bold tracking-tight text-sm text-slate-950 leading-tight">SafePay</span>
-                    <span className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wider">
-                      Senior Shield
-                    </span>
-                  </div>
-                )}
+                <div
+                  className={`flex flex-col overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                    seniorSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[170px] opacity-100'
+                  }`}
+                >
+                  <span className="font-bold tracking-tight text-sm text-slate-950 leading-tight">SafePay</span>
+                  <span className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wider">
+                    Senior Shield
+                  </span>
+                </div>
               </Link>
             </div>
 
             {/* Sidebar Navigation Items */}
-            <nav className={`space-y-1.5 flex-1 ${seniorSidebarCollapsed ? 'p-2' : 'p-3'}`}>
+            <nav className="p-3 space-y-1.5 flex-1 overflow-x-hidden">
               {/* Option 1: My Profile */}
               <button
                 onClick={() => {
                   setSeniorTab('profile');
                   setSeniorMobileMenuOpen(false);
                 }}
-                className={`transition-all font-semibold text-xs ${
-                  seniorSidebarCollapsed
-                    ? 'w-11 h-11 mx-auto flex items-center justify-center rounded-2xl relative'
-                    : 'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl'
-                } ${
+                className={`w-full flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition-colors duration-200 relative group overflow-hidden ${
                   seniorTab === 'profile'
                     ? 'bg-slate-950 text-white shadow-md shadow-slate-950/10'
                     : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/80'
                 }`}
                 title="My Profile & Safeguards"
               >
-                <User className={`w-4 h-4 shrink-0 ${seniorTab === 'profile' ? 'text-emerald-400' : 'text-slate-500'}`} />
-                {!seniorSidebarCollapsed && (
-                  <div className="flex-1 text-left flex items-center justify-between">
-                    <span>My Profile</span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">
-                      Shield
-                    </span>
-                  </div>
-                )}
+                <div className="w-5 h-5 flex items-center justify-center shrink-0">
+                  <User className={`w-4 h-4 ${seniorTab === 'profile' ? 'text-emerald-400' : 'text-slate-500'}`} />
+                </div>
+                <div
+                  className={`ml-2.5 flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                    seniorSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[170px] opacity-100'
+                  }`}
+                >
+                  <span className="truncate">My Profile</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 ml-1">
+                    Shield
+                  </span>
+                </div>
               </button>
 
               {/* Option 2: Ledger & Simulation */}
@@ -1108,71 +1109,73 @@ export default function DashboardPage() {
                   setSeniorTab('ledger');
                   setSeniorMobileMenuOpen(false);
                 }}
-                className={`transition-all font-semibold text-xs ${
-                  seniorSidebarCollapsed
-                    ? 'w-11 h-11 mx-auto flex items-center justify-center rounded-2xl relative'
-                    : 'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl'
-                } ${
+                className={`w-full flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition-colors duration-200 relative group overflow-hidden ${
                   seniorTab === 'ledger'
                     ? 'bg-slate-950 text-white shadow-md shadow-slate-950/10'
                     : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/80'
                 }`}
                 title="Ledger & PayPal Simulation"
               >
-                <ReceiptText className={`w-4 h-4 shrink-0 ${seniorTab === 'ledger' ? 'text-purple-400' : 'text-slate-500'}`} />
-                {!seniorSidebarCollapsed && (
-                  <div className="flex-1 text-left flex items-center justify-between">
-                    <span>Ledger</span>
-                    {seniorHolds.length > 0 ? (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-white animate-pulse">
-                        {seniorHolds.length} Hold
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                        {seniorRecentPayments.length}
-                      </span>
-                    )}
-                  </div>
-                )}
+                <div className="w-5 h-5 flex items-center justify-center shrink-0">
+                  <ReceiptText className={`w-4 h-4 ${seniorTab === 'ledger' ? 'text-purple-400' : 'text-slate-500'}`} />
+                </div>
+                <div
+                  className={`ml-2.5 flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                    seniorSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[170px] opacity-100'
+                  }`}
+                >
+                  <span className="truncate">Ledger</span>
+                  {seniorHolds.length > 0 ? (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-white animate-pulse ml-1">
+                      {seniorHolds.length} Hold
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700 ml-1">
+                      {seniorRecentPayments.length}
+                    </span>
+                  )}
+                </div>
                 {seniorSidebarCollapsed && seniorHolds.length > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white animate-pulse" />
+                  <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white animate-pulse" />
                 )}
               </button>
             </nav>
           </div>
 
           {/* Bottom Senior Profile Card & Sign Out */}
-          <div className={`p-3 border-t border-slate-100 ${seniorSidebarCollapsed ? 'flex flex-col items-center gap-2' : ''}`}>
-            {!seniorSidebarCollapsed ? (
-              <div className="p-2.5 rounded-2xl bg-white/90 border border-slate-200/80 shadow-2xs space-y-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
-                    {currentUser?.fullName?.charAt(0) || 'T'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-slate-900 truncate">{currentUser?.fullName || 'Senior'}</p>
-                    <p className="text-[10px] text-emerald-700 font-semibold truncate flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Protected Senior
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="w-full py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Sign Out</span>
-                </button>
+          <div className="p-3 border-t border-slate-100 space-y-2 overflow-hidden">
+            <div className="p-2 rounded-2xl bg-white/90 border border-slate-200/80 shadow-2xs flex items-center overflow-hidden">
+              <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                {currentUser?.fullName?.charAt(0) || 'T'}
               </div>
-            ) : (
-              <button
-                onClick={handleLogout}
-                className="w-10 h-10 rounded-2xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors"
-                title="Sign Out"
+              <div
+                className={`ml-2.5 flex-1 min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                  seniorSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[150px] opacity-100'
+                }`}
               >
-                <LogOut className="w-4 h-4" />
-              </button>
-            )}
+                <p className="text-xs font-bold text-slate-900 truncate">{currentUser?.fullName || 'Senior'}</p>
+                <p className="text-[10px] text-emerald-700 font-semibold truncate flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Protected Senior
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 text-xs font-semibold transition-colors flex items-center justify-center overflow-hidden"
+              title="Sign Out"
+            >
+              <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                <LogOut className="w-3.5 h-3.5" />
+              </div>
+              <div
+                className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                  seniorSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none ml-0' : 'max-w-[100px] opacity-100 ml-1.5'
+                }`}
+              >
+                <span>Sign Out</span>
+              </div>
+            </button>
           </div>
         </aside>
 
@@ -2093,274 +2096,260 @@ export default function DashboardPage() {
           className="hidden md:flex absolute -right-3 top-5 w-6 h-6 rounded-full bg-white border border-slate-200/90 shadow-md items-center justify-center text-slate-500 hover:text-slate-950 hover:scale-110 active:scale-95 transition-all z-40"
           title={isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
         >
-          {isSidebarCollapsed ? (
-            <ChevronRight className="w-3.5 h-3.5" />
-          ) : (
-            <ChevronLeft className="w-3.5 h-3.5" />
-          )}
+          <ChevronLeft
+            className={`w-3.5 h-3.5 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              isSidebarCollapsed ? 'rotate-180' : 'rotate-0'
+            }`}
+          />
         </button>
 
         {/* Top Header & Brand */}
-        <div
-          className={`h-16 border-b border-slate-200/60 flex items-center ${
-            isSidebarCollapsed ? 'justify-center px-2' : 'justify-between px-4'
-          }`}
-        >
-          {isSidebarCollapsed ? (
-            <Link href="/" className="flex items-center justify-center group" title="SafePay - Caregiver Shield">
-              <div className="w-10 h-10 rounded-2xl bg-slate-950 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
-                <ShieldCheck className="w-5 h-5 text-emerald-400" />
-              </div>
-            </Link>
-          ) : (
-            <Link href="/" className="flex items-center gap-2.5 overflow-hidden group">
-              <div className="w-9 h-9 rounded-2xl bg-slate-950 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
-                <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
-              </div>
-              <div className="flex flex-col overflow-hidden whitespace-nowrap animate-in fade-in duration-200">
-                <span className="font-bold tracking-tight text-sm text-slate-950 leading-tight">SafePay</span>
-                <span className="text-[10px] font-semibold text-purple-700 uppercase tracking-wider">Caregiver Shield</span>
-              </div>
-            </Link>
-          )}
+        <div className="h-16 border-b border-slate-200/60 flex items-center px-4 overflow-hidden">
+          <Link href="/" className="flex items-center gap-2.5 min-w-0 group" title="SafePay - Caregiver Shield">
+            <div className="w-9 h-9 rounded-2xl bg-slate-950 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+              <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
+            </div>
+            <div
+              className={`flex flex-col overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[170px] opacity-100'
+              }`}
+            >
+              <span className="font-bold tracking-tight text-sm text-slate-950 leading-tight">SafePay</span>
+              <span className="text-[10px] font-semibold text-purple-700 uppercase tracking-wider">Caregiver Shield</span>
+            </div>
+          </Link>
         </div>
 
         {/* Primary Navigation Items */}
-        <div className={`space-y-1.5 flex-1 overflow-y-auto overflow-x-hidden ${isSidebarCollapsed ? 'p-2' : 'p-3'}`}>
+        <div className="p-3 space-y-1.5 flex-1 overflow-y-auto overflow-x-hidden">
           {/* Nav Item: Overview */}
           <button
             onClick={() => setActiveTab('overview')}
-            className={`transition-all font-semibold text-xs ${
-              isSidebarCollapsed
-                ? 'w-11 h-11 mx-auto flex items-center justify-center rounded-2xl relative'
-                : 'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl'
-            } ${
+            className={`w-full flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition-colors duration-200 relative group overflow-hidden ${
               activeTab === 'overview'
                 ? 'bg-slate-950 text-white shadow-md shadow-slate-950/10'
                 : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/80'
             }`}
             title="Overview & Pending Approvals"
           >
-            <LayoutDashboard className={`w-4 h-4 shrink-0 ${activeTab === 'overview' ? 'text-purple-400' : 'text-slate-500'}`} />
-            {!isSidebarCollapsed && <span className="truncate">Overview</span>}
-            {isSidebarCollapsed ? (
-              pendingApprovals.length > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white animate-pulse" />
-              )
-            ) : (
-              pendingApprovals.length > 0 && (
-                <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
+            <div className="w-5 h-5 flex items-center justify-center shrink-0">
+              <LayoutDashboard className={`w-4 h-4 ${activeTab === 'overview' ? 'text-purple-400' : 'text-slate-500'}`} />
+            </div>
+            <div
+              className={`ml-2.5 flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[170px] opacity-100'
+              }`}
+            >
+              <span className="truncate">Overview</span>
+              {pendingApprovals.length > 0 && (
+                <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
                   {pendingApprovals.length}
                 </span>
-              )
+              )}
+            </div>
+            {isSidebarCollapsed && pendingApprovals.length > 0 && (
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white animate-pulse" />
             )}
           </button>
 
           {/* Nav Item: Elder Profiles */}
           <button
             onClick={() => setActiveTab('elders')}
-            className={`transition-all font-semibold text-xs ${
-              isSidebarCollapsed
-                ? 'w-11 h-11 mx-auto flex items-center justify-center rounded-2xl relative'
-                : 'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl'
-            } ${
+            className={`w-full flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition-colors duration-200 relative group overflow-hidden ${
               activeTab === 'elders'
                 ? 'bg-slate-950 text-white shadow-md shadow-slate-950/10'
                 : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/80'
             }`}
             title="Elder Accounts & Past Ledger"
           >
-            <Users className={`w-4 h-4 shrink-0 ${activeTab === 'elders' ? 'text-emerald-400' : 'text-slate-500'}`} />
-            {!isSidebarCollapsed && <span className="truncate">Elder Profiles</span>}
-            {!isSidebarCollapsed && (
-              <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-900">
+            <div className="w-5 h-5 flex items-center justify-center shrink-0">
+              <Users className={`w-4 h-4 ${activeTab === 'elders' ? 'text-emerald-400' : 'text-slate-500'}`} />
+            </div>
+            <div
+              className={`ml-2.5 flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[170px] opacity-100'
+              }`}
+            >
+              <span className="truncate">Elder Profiles</span>
+              <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-900">
                 {linkedElders.length}
               </span>
-            )}
+            </div>
           </button>
 
           {/* Nav Item: AI Assistant Chat */}
           <button
             onClick={() => setActiveTab('ai-chat')}
-            className={`transition-all font-semibold text-xs ${
-              isSidebarCollapsed
-                ? 'w-11 h-11 mx-auto flex items-center justify-center rounded-2xl relative'
-                : 'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl'
-            } ${
+            className={`w-full flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition-colors duration-200 relative group overflow-hidden ${
               activeTab === 'ai-chat'
                 ? 'bg-slate-950 text-white shadow-md shadow-slate-950/10'
                 : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/80'
             }`}
             title="AI Assistant Workspace"
           >
-            <Bot className={`w-4 h-4 shrink-0 ${activeTab === 'ai-chat' ? 'text-purple-400' : 'text-slate-500'}`} />
-            {!isSidebarCollapsed && <span className="truncate">AI Assistant Chat</span>}
-            {!isSidebarCollapsed && pendingApprovals.length > 0 && (
-              <span className="ml-auto w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+            <div className="w-5 h-5 flex items-center justify-center shrink-0">
+              <Bot className={`w-4 h-4 ${activeTab === 'ai-chat' ? 'text-purple-400' : 'text-slate-500'}`} />
+            </div>
+            <div
+              className={`ml-2.5 flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[170px] opacity-100'
+              }`}
+            >
+              <span className="truncate">AI Assistant Chat</span>
+              {pendingApprovals.length > 0 && (
+                <span className="ml-1 w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              )}
+            </div>
+            {isSidebarCollapsed && pendingApprovals.length > 0 && (
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-400 animate-ping" />
             )}
           </button>
 
           {/* Nav Item: My Profile */}
           <button
             onClick={() => setActiveTab('profile')}
-            className={`transition-all font-semibold text-xs ${
-              isSidebarCollapsed
-                ? 'w-11 h-11 mx-auto flex items-center justify-center rounded-2xl relative'
-                : 'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl'
-            } ${
+            className={`w-full flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition-colors duration-200 relative group overflow-hidden ${
               activeTab === 'profile'
                 ? 'bg-slate-950 text-white shadow-md shadow-slate-950/10'
                 : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/80'
             }`}
             title="Caregiver Profile & Notification Settings"
           >
-            <User className={`w-4 h-4 shrink-0 ${activeTab === 'profile' ? 'text-purple-400' : 'text-slate-500'}`} />
-            {!isSidebarCollapsed && <span className="truncate">My Profile</span>}
+            <div className="w-5 h-5 flex items-center justify-center shrink-0">
+              <User className={`w-4 h-4 ${activeTab === 'profile' ? 'text-purple-400' : 'text-slate-500'}`} />
+            </div>
+            <div
+              className={`ml-2.5 flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[170px] opacity-100'
+              }`}
+            >
+              <span className="truncate">My Profile</span>
+            </div>
           </button>
 
           {/* Connected Seniors Sub-List in Sidebar */}
           {linkedElders.length > 0 && (
-            isSidebarCollapsed ? (
-              /* Collapsible compact avatar list */
-              <div className="pt-3 border-t border-slate-200/50 space-y-2 flex flex-col items-center">
-                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
-                  Elders
+            <div className="pt-3 border-t border-slate-200/50 space-y-1.5">
+              <div className="px-2 flex items-center justify-between overflow-hidden">
+                <span
+                  className={`text-[9px] font-bold uppercase tracking-wider text-slate-400 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden whitespace-nowrap ${
+                    isSidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-[120px] opacity-100'
+                  }`}
+                >
+                  Protected Seniors
                 </span>
-                <div className="space-y-1.5 flex flex-col items-center">
-                  {linkedElders.map((elder) => {
-                    const hasHold = pendingApprovals.some(
-                      (p) => p.elderName.toLowerCase() === elder.fullName.toLowerCase()
-                    );
-                    const isSelected = activeElder?.id === elder.id;
-                    return (
-                      <button
-                        key={elder.id}
-                        onClick={() => {
-                          setSelectedElderId(elder.id);
-                          if (activeTab === 'overview') setActiveTab('elders');
-                        }}
-                        className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs relative transition-transform hover:scale-105 ${
+                <button
+                  onClick={() => setIsConnectModalOpen(true)}
+                  className="hover:text-purple-600 transition-colors p-1 text-slate-400"
+                  title="Add another senior"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="space-y-1">
+                {linkedElders.map((elder) => {
+                  const hasHold = pendingApprovals.some(
+                    (p) => p.elderName.toLowerCase() === elder.fullName.toLowerCase()
+                  );
+                  const isSelected = activeElder?.id === elder.id;
+                  return (
+                    <button
+                      key={elder.id}
+                      onClick={() => {
+                        setSelectedElderId(elder.id);
+                        if (activeTab === 'overview') setActiveTab('elders');
+                      }}
+                      className={`w-full flex items-center px-2 py-1.5 rounded-xl text-xs font-medium transition-all group overflow-hidden ${
+                        isSelected
+                          ? 'bg-purple-100/80 text-purple-950 font-bold'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                      title={`${elder.fullName} (${elder.relationship})${hasHold ? ' • Pending Hold!' : ''}`}
+                    >
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 transition-transform ${
                           isSelected
-                            ? 'bg-purple-600 text-white ring-2 ring-purple-600/30 shadow-xs'
-                            : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
-                        }`}
-                        title={`${elder.fullName} (${elder.relationship})${hasHold ? ' • Pending Hold!' : ''}`}
-                      >
-                        <span>{elder.fullName.charAt(0)}</span>
-                        {hasHold && (
-                          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white animate-pulse" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              /* Expanded senior list with full titles */
-              <div className="pt-4 space-y-1.5 animate-in fade-in duration-150">
-                <div className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                  <span>Protected Seniors</span>
-                  <button
-                    onClick={() => setIsConnectModalOpen(true)}
-                    className="hover:text-purple-600 transition-colors"
-                    title="Add another senior"
-                  >
-                    <UserPlus className="w-3 h-3" />
-                  </button>
-                </div>
-                <div className="space-y-1">
-                  {linkedElders.map((elder) => {
-                    const hasHold = pendingApprovals.some(
-                      (p) => p.elderName.toLowerCase() === elder.fullName.toLowerCase()
-                    );
-                    return (
-                      <button
-                        key={elder.id}
-                        onClick={() => {
-                          setSelectedElderId(elder.id);
-                          if (activeTab === 'overview') setActiveTab('elders');
-                        }}
-                        className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
-                          activeElder?.id === elder.id
-                            ? 'bg-purple-100/80 text-purple-950 font-bold'
-                            : 'text-slate-600 hover:bg-slate-100'
+                            ? 'bg-purple-600 text-white shadow-xs'
+                            : 'bg-purple-100 text-purple-800'
                         }`}
                       >
-                        <span className="truncate flex items-center gap-1.5">
-                          <Heart className="w-3 h-3 text-rose-400 shrink-0" />
-                          <span className="truncate">{elder.fullName}</span>
-                        </span>
+                        {elder.fullName.charAt(0)}
+                      </div>
+                      <div
+                        className={`ml-2 flex items-center justify-between flex-1 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                          isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[160px] opacity-100'
+                        }`}
+                      >
+                        <span className="truncate">{elder.fullName}</span>
                         {hasHold && (
-                          <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse" />
+                          <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse ml-1" />
                         )}
-                      </button>
-                    );
-                  })}
-                </div>
+                      </div>
+                      {isSidebarCollapsed && hasHold && (
+                        <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 ring-1 ring-white animate-pulse" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-            )
+            </div>
           )}
         </div>
 
         {/* Sidebar Footer */}
-        <div className={`border-t border-slate-200/60 ${isSidebarCollapsed ? 'p-2 space-y-2 flex flex-col items-center' : 'p-3 space-y-2'}`}>
+        <div className="p-3 border-t border-slate-200/60 space-y-2 overflow-hidden">
           {/* Connect Elder Button */}
-          {isSidebarCollapsed ? (
-            <button
-              onClick={() => setIsConnectModalOpen(true)}
-              className="w-10 h-10 rounded-2xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200/70 flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-2xs"
-              title="Invite Senior Member"
-            >
+          <button
+            onClick={() => setIsConnectModalOpen(true)}
+            className="w-full flex items-center px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200/70 text-xs font-semibold transition-all active:scale-95 overflow-hidden"
+            title="Invite Senior Member"
+          >
+            <div className="w-5 h-5 flex items-center justify-center shrink-0">
               <UserPlus className="w-4 h-4 text-purple-600" />
-            </button>
-          ) : (
-            <button
-              onClick={() => setIsConnectModalOpen(true)}
-              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200/70 text-xs font-semibold transition-all active:scale-95"
-              title="Invite Senior Member"
+            </div>
+            <div
+              className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none ml-0' : 'max-w-[150px] opacity-100 ml-2'
+              }`}
             >
-              <UserPlus className="w-3.5 h-3.5 text-purple-600" />
               <span>Invite Senior</span>
-            </button>
-          )}
+            </div>
+          </button>
 
           {/* User Profile Mini Bar */}
-          {isSidebarCollapsed ? (
-            <div className="flex flex-col items-center gap-1.5 w-full">
-              <div
-                className="w-10 h-10 rounded-2xl bg-purple-700 text-white flex items-center justify-center font-bold text-xs shadow-xs"
-                title={`${currentUser?.fullName || 'Caregiver'} (${currentUser?.email || ''})`}
-              >
-                {currentUser?.fullName?.charAt(0) || 'C'}
-              </div>
-              <button
-                onClick={handleLogout}
-                className="w-8 h-8 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors"
-                title="Sign Out"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
+          <div className="flex items-center p-2 rounded-xl bg-slate-50/80 border border-slate-200/50 overflow-hidden">
+            <div
+              className="w-8 h-8 rounded-full bg-purple-700 text-white flex items-center justify-center font-bold text-xs shrink-0"
+              title={`${currentUser?.fullName || 'Caregiver'} (${currentUser?.email || ''})`}
+            >
+              {currentUser?.fullName?.charAt(0) || 'C'}
             </div>
-          ) : (
-            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50/80 border border-slate-200/50">
-              <div className="flex items-center gap-2 overflow-hidden">
-                <div className="w-7 h-7 rounded-full bg-purple-700 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                  {currentUser?.fullName?.charAt(0) || 'C'}
-                </div>
-                <div className="overflow-hidden">
-                  <div className="text-xs font-bold text-slate-900 truncate">{currentUser?.fullName}</div>
-                  <div className="text-[10px] text-slate-500 font-mono truncate">{currentUser?.email}</div>
-                </div>
-              </div>
-
-              <button
-                onClick={handleLogout}
-                className="p-1 text-slate-400 hover:text-slate-900 rounded-lg hover:bg-white transition-colors"
-                title="Sign Out"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
+            <div
+              className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none ml-0' : 'max-w-[130px] opacity-100 ml-2 flex-1'
+              }`}
+            >
+              <div className="text-xs font-bold text-slate-900 truncate">{currentUser?.fullName}</div>
+              <div className="text-[10px] text-slate-500 font-mono truncate">{currentUser?.email}</div>
             </div>
+            <button
+              onClick={handleLogout}
+              className={`p-1.5 text-slate-400 hover:text-slate-900 rounded-lg hover:bg-white transition-colors shrink-0 ${
+                isSidebarCollapsed ? 'hidden' : 'block'
+              }`}
+              title="Sign Out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {isSidebarCollapsed && (
+            <button
+              onClick={handleLogout}
+              className="w-full py-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl flex items-center justify-center transition-colors"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           )}
         </div>
       </aside>
@@ -3075,7 +3064,7 @@ export default function DashboardPage() {
                   : 'bg-white/80 border-slate-200/80 text-slate-900 backdrop-blur-md'
               }`}
             >
-              {/* Header Bar: SafePay AI badge + Dark/Light toggle (No macOS 3 dots, No Sequoia, No Senior/Family view toggle) */}
+              {/* Header Bar: Minimal AI Assistant Identity ("Haven") + Dark/Light toggle */}
               <div
                 className={`h-14 px-5 flex items-center justify-between border-b transition-colors duration-200 ${
                   chatDark
@@ -3083,24 +3072,12 @@ export default function DashboardPage() {
                     : 'bg-white/60 border-black/5 text-slate-900'
                 } backdrop-blur-md`}
               >
-                {/* Brand / Agent Context */}
-                <div className="flex items-center gap-3">
+                {/* Minimal AI Assistant Brand */}
+                <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-purple-600/10 border border-purple-500/20 text-purple-600 flex items-center justify-center font-bold">
                     <Bot className="w-4 h-4 text-purple-600" />
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs tracking-tight">SafePay AI Assistant</span>
-                      <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live Guardian RAG
-                      </span>
-                    </div>
-                    {activeElder && (
-                      <p className={`text-[11px] ${chatDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Context active for: <strong className={chatDark ? 'text-white' : 'text-slate-900'}>{activeElder.fullName}</strong> ({activeElder.relationship})
-                      </p>
-                    )}
-                  </div>
+                  <span className="font-bold text-sm tracking-tight">Haven</span>
                 </div>
 
                 {/* Dark / Light Mode Toggle Button */}
@@ -3135,39 +3112,41 @@ export default function DashboardPage() {
                   chatDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50/50 text-slate-900'
                 }`}
               >
-                {/* Left Elder Switcher Sidebar (Collapsible with smooth fluid transition) */}
+                {/* Left Elder Switcher Sidebar (Silky Smooth Collapse / Expand Animation) */}
                 <aside
-                  className={`border-r transition-[width,padding] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col shrink-0 ${
+                  className={`border-r transition-[width,padding] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col shrink-0 overflow-hidden ${
                     chatDark ? 'bg-slate-900/60 border-white/10' : 'bg-white/70 border-black/5'
-                  } ${isElderChatSidebarCollapsed ? 'w-16 p-2 items-center' : 'w-full md:w-72 p-4'}`}
+                  } ${isElderChatSidebarCollapsed ? 'w-16 p-2.5 items-center' : 'w-full md:w-72 p-4'}`}
                 >
-                  <div className="flex items-center justify-between mb-3 w-full">
-                    {!isElderChatSidebarCollapsed && (
-                      <span
-                        className={`text-[10px] font-bold uppercase tracking-wider ${
-                          chatDark ? 'text-slate-400' : 'text-slate-500'
-                        }`}
-                      >
-                        Elder Accounts
-                      </span>
-                    )}
+                  <div className="flex items-center justify-between mb-3 w-full overflow-hidden">
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                        isElderChatSidebarCollapsed ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[160px]'
+                      } ${chatDark ? 'text-slate-400' : 'text-slate-500'}`}
+                    >
+                      Elder Accounts
+                    </span>
                     <button
                       onClick={() => setIsElderChatSidebarCollapsed((prev) => !prev)}
-                      className={`p-1.5 rounded-xl transition-colors ${
+                      className={`p-1.5 rounded-xl transition-colors shrink-0 ${
                         chatDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-black/5 text-slate-500'
                       }`}
                       title={isElderChatSidebarCollapsed ? 'Expand Elders' : 'Collapse Elders'}
                     >
-                      {isElderChatSidebarCollapsed ? (
-                        <ChevronRight className="w-4 h-4" />
-                      ) : (
-                        <ChevronLeft className="w-4 h-4" />
-                      )}
+                      <ChevronLeft
+                        className={`w-4 h-4 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                          isElderChatSidebarCollapsed ? 'rotate-180' : 'rotate-0'
+                        }`}
+                      />
                     </button>
                   </div>
 
-                  {!isElderChatSidebarCollapsed && (
-                    <div className="relative mb-3 w-full">
+                  <div
+                    className={`transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden w-full ${
+                      isElderChatSidebarCollapsed ? 'opacity-0 max-h-0 mb-0 pointer-events-none' : 'opacity-100 max-h-12 mb-3'
+                    }`}
+                  >
+                    <div className="relative w-full">
                       <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
                         type="text"
@@ -3181,7 +3160,7 @@ export default function DashboardPage() {
                         }`}
                       />
                     </div>
-                  )}
+                  </div>
 
                   <div className="space-y-1.5 flex-1 overflow-y-auto w-full">
                     {linkedElders
@@ -3197,7 +3176,7 @@ export default function DashboardPage() {
                           <button
                             key={elder.id}
                             onClick={() => setSelectedElderId(elder.id)}
-                            className={`w-full text-left p-2.5 rounded-2xl flex items-center gap-3 cursor-pointer transition-all border ${
+                            className={`w-full text-left p-2 rounded-2xl flex items-center cursor-pointer transition-all border ${
                               isSelected
                                 ? chatDark
                                   ? 'bg-purple-600/20 border-purple-500/40 text-white shadow-xs'
@@ -3205,39 +3184,41 @@ export default function DashboardPage() {
                                 : chatDark
                                 ? 'border-transparent hover:bg-white/5 text-slate-300'
                                 : 'border-transparent hover:bg-black/[0.03] text-slate-700'
-                            } ${isElderChatSidebarCollapsed ? 'justify-center p-2' : ''}`}
+                            }`}
                             title={`${elder.fullName} (${elder.relationship})`}
                           >
                             <div className="w-9 h-9 rounded-full bg-purple-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
                               {elder.fullName.charAt(0)}
                             </div>
-                            {!isElderChatSidebarCollapsed && (
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between">
-                                  <h4
-                                    className={`text-xs font-bold truncate ${
-                                      isSelected
-                                        ? chatDark ? 'text-white' : 'text-purple-950'
-                                        : chatDark ? 'text-slate-200' : 'text-slate-900'
-                                    }`}
-                                  >
-                                    {elder.fullName}
-                                  </h4>
-                                  {elderHolds.length > 0 && (
-                                    <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 animate-pulse shrink-0">
-                                      {elderHolds.length} Hold
-                                    </span>
-                                  )}
-                                </div>
-                                <p
-                                  className={`text-[10px] truncate mt-0.5 ${
-                                    chatDark ? 'text-slate-400' : 'text-slate-500'
+                            <div
+                              className={`ml-2.5 flex-1 min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                                isElderChatSidebarCollapsed ? 'opacity-0 max-w-0 pointer-events-none' : 'opacity-100 max-w-[180px]'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <h4
+                                  className={`text-xs font-bold truncate ${
+                                    isSelected
+                                      ? chatDark ? 'text-white' : 'text-purple-950'
+                                      : chatDark ? 'text-slate-200' : 'text-slate-900'
                                   }`}
                                 >
-                                  {elder.relationship} • Cap ${elder.protectionSettings.absoluteDailyCap}
-                                </p>
+                                  {elder.fullName}
+                                </h4>
+                                {elderHolds.length > 0 && (
+                                  <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 animate-pulse shrink-0 ml-1">
+                                    {elderHolds.length} Hold
+                                  </span>
+                                )}
                               </div>
-                            )}
+                              <p
+                                className={`text-[10px] truncate mt-0.5 ${
+                                  chatDark ? 'text-slate-400' : 'text-slate-500'
+                                }`}
+                              >
+                                {elder.relationship} • Cap ${elder.protectionSettings.absoluteDailyCap}
+                              </p>
+                            </div>
                           </button>
                         );
                       })}
@@ -3246,10 +3227,10 @@ export default function DashboardPage() {
 
                 {/* Right Chat & Controls Main Pane */}
                 <main className="flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
-                  {/* Top Bar for active elder context & quick metrics */}
+                  {/* Top Bar for active elder context & quick metrics (Without Deep Context RAG pill) */}
                   {activeElder && (
                     <div
-                      className={`p-3.5 border-b flex items-center justify-between transition-colors ${
+                      className={`p-3.5 border-b flex items-center justify-between shrink-0 transition-colors ${
                         chatDark ? 'bg-slate-900/60 border-white/10' : 'bg-white/80 border-black/5'
                       }`}
                     >
@@ -3265,12 +3246,6 @@ export default function DashboardPage() {
                             Auto-Approval: ${activeElder.protectionSettings.familyApprovalThreshold} • Daily Cap: ${activeElder.protectionSettings.absoluteDailyCap} • {activeElder.city || 'Local Area'}
                           </div>
                         </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-purple-600 bg-purple-500/10 px-2.5 py-1 rounded-full border border-purple-500/20">
-                          Deep Context RAG
-                        </span>
                       </div>
                     </div>
                   )}
