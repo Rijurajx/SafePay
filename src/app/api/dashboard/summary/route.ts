@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
-import { FamilyLinkStatus, ApprovalRequestStatus, PaymentRequestStatus } from '@prisma/client';
+import { FamilyLinkStatus, ApprovalRequestStatus, PaymentRequestStatus, Role } from '@prisma/client';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,30 @@ export async function GET(req: NextRequest) {
 
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
+
+    // Auto-heal check: if this user was created or linked as an elder and has 0 elders as caregiver:
+    if (session.roleDefault === 'CAREGIVER') {
+      const isLinkedAsElder = await prisma.familyLink.findFirst({
+        where: { elderId: session.id },
+      });
+      const hasCaregiverLinks = await prisma.familyLink.findFirst({
+        where: { caregiverId: session.id },
+      });
+
+      if (isLinkedAsElder && !hasCaregiverLinks) {
+        await prisma.user.update({
+          where: { id: session.id },
+          data: { roleDefault: Role.PROTECTED_USER },
+        });
+        session.roleDefault = Role.PROTECTED_USER;
+        try {
+          const adminSb = createAdminClient();
+          await adminSb.auth.admin.updateUserById(session.id, {
+            user_metadata: { role: 'PROTECTED_USER', is_elder: true },
+          });
+        } catch {}
+      }
+    }
 
     if (session.roleDefault === 'CAREGIVER') {
       // Find all elders linked to this caregiver

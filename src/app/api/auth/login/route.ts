@@ -4,6 +4,8 @@ import { generateSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } fr
 import bcrypt from 'bcryptjs';
 import { Role } from '@prisma/client';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { Decimal } from '@prisma/client/runtime/library';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,12 +27,38 @@ export async function POST(req: NextRequest) {
       where: { email: normalizedEmail },
     });
 
+    // Check if this account is actually a protected elder
+    const isLinkedAsElder = await prisma.familyLink.findFirst({
+      where: {
+        OR: [
+          { elder: { email: normalizedEmail } },
+          ...(user?.id ? [{ elderId: user.id }] : []),
+        ],
+      },
+    });
+    const hasCaregiverLinks = user?.id
+      ? await prisma.familyLink.findFirst({ where: { caregiverId: user.id } })
+      : null;
+
     // 1. If user exists in DB and has local passwordHash
     if (user && user.passwordHash) {
       const isValid = await bcrypt.compare(password, user.passwordHash);
       if (isValid) {
+        // If inactive but valid credentials, activate user
         if (!user.isActive) {
-          return NextResponse.json({ error: 'This account is inactive.' }, { status: 401 });
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { isActive: true },
+          });
+          user.isActive = true;
+        }
+
+        // Auto-heal: Ensure elder is never trapped with CAREGIVER role
+        if (isLinkedAsElder && !hasCaregiverLinks && user.roleDefault !== Role.PROTECTED_USER) {
+          user = await prisma.user.update({
+            where: { id: user.id },
+            data: { roleDefault: Role.PROTECTED_USER },
+          });
         }
 
         const token = await generateSessionToken(user.id, user.email);
@@ -100,18 +128,49 @@ export async function POST(req: NextRequest) {
           supaLogin.user.user_metadata?.name ||
           normalizedEmail.split('@')[0];
 
+        // Strict role resolution: preserve PROTECTED_USER or detect elder linkage
+        let determinedRole: Role = Role.CAREGIVER;
+        if (user?.roleDefault === Role.PROTECTED_USER || (isLinkedAsElder && !hasCaregiverLinks)) {
+          determinedRole = Role.PROTECTED_USER;
+        } else if (
+          supaLogin.user.user_metadata?.role === 'PROTECTED_USER' ||
+          supaLogin.user.user_metadata?.is_elder
+        ) {
+          determinedRole = Role.PROTECTED_USER;
+        } else if (user?.roleDefault) {
+          determinedRole = user.roleDefault;
+        }
+
         if (!user) {
           user = await prisma.user.create({
             data: {
               email: normalizedEmail,
               fullName: userName,
-              roleDefault: Role.CAREGIVER,
+              roleDefault: determinedRole,
               isActive: true,
               isSynthetic: false,
               passwordHash,
               supabaseId: supaLogin.user.id,
             },
           });
+
+          if (determinedRole === Role.PROTECTED_USER) {
+            await prisma.protectionSettings.upsert({
+              where: { elderId: user.id },
+              create: {
+                elderId: user.id,
+                currency: 'USD',
+                familyApprovalThreshold: new Decimal(100),
+                absoluteDailyCap: new Decimal(1000),
+                absoluteTransactionCap: new Decimal(500),
+                monthlyBudget: new Decimal(2000),
+                requireFamilyForNewRecipient: true,
+                requireFamilyForUnusual: true,
+                approvalTimeoutMinutes: 30,
+              },
+              update: {},
+            });
+          }
         } else {
           user = await prisma.user.update({
             where: { id: user.id },
@@ -119,9 +178,22 @@ export async function POST(req: NextRequest) {
               passwordHash,
               supabaseId: supaLogin.user.id,
               isActive: true,
-              roleDefault: Role.CAREGIVER,
+              roleDefault: determinedRole,
             },
           });
+        }
+
+        // Keep Supabase user metadata in sync with correct role
+        try {
+          const adminSb = createAdminClient();
+          await adminSb.auth.admin.updateUserById(supaLogin.user.id, {
+            user_metadata: {
+              role: determinedRole,
+              is_elder: determinedRole === Role.PROTECTED_USER,
+            },
+          });
+        } catch (syncErr) {
+          console.warn('Supabase metadata sync notice on login:', syncErr);
         }
 
         const token = await generateSessionToken(user.id, user.email);

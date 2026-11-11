@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       const staleUser = listData?.users?.find(
         (u) => u.email?.toLowerCase() === normalizedEmail
       );
-      if (staleUser) {
+      if (staleUser && staleUser.user_metadata?.role !== 'PROTECTED_USER') {
         await adminSb.auth.admin.deleteUser(staleUser.id);
       }
     } catch (cleanErr) {

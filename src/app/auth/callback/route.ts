@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { prisma } from '@/lib/db';
 import { generateSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from '@/lib/auth';
-import { Role } from '@prisma/client';
+import { Role, FamilyLinkStatus } from '@prisma/client';
 import { type EmailOtpType } from '@supabase/supabase-js';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { Decimal } from '@prisma/client/runtime/library';
 
 export const dynamic = 'force-dynamic';
 
@@ -98,22 +100,66 @@ export async function GET(request: NextRequest) {
       authUser.user_metadata?.name ||
       authUser.email.split('@')[0];
 
-    // 4. Locate or create caregiver in database
+    // 4. Locate or create user in database
     let dbUser = await prisma.user.findUnique({
       where: { email: userEmail },
     });
+
+    // Check if user is linked as an elder
+    const isLinkedAsElder = await prisma.familyLink.findFirst({
+      where: {
+        OR: [
+          { elder: { email: userEmail } },
+          ...(dbUser?.id ? [{ elderId: dbUser.id }] : []),
+        ],
+      },
+    });
+    const hasCaregiverLinks = dbUser?.id
+      ? await prisma.familyLink.findFirst({ where: { caregiverId: dbUser.id } })
+      : null;
+
+    // Strict role determination: preserve PROTECTED_USER or detect elder linkage
+    let determinedRole: Role = Role.CAREGIVER;
+    if (dbUser?.roleDefault === Role.PROTECTED_USER || (isLinkedAsElder && !hasCaregiverLinks)) {
+      determinedRole = Role.PROTECTED_USER;
+    } else if (
+      authUser.user_metadata?.role === 'PROTECTED_USER' ||
+      authUser.user_metadata?.is_elder
+    ) {
+      determinedRole = Role.PROTECTED_USER;
+    } else if (dbUser?.roleDefault) {
+      determinedRole = dbUser.roleDefault;
+    }
 
     if (!dbUser) {
       dbUser = await prisma.user.create({
         data: {
           email: userEmail,
           fullName: userName,
-          roleDefault: Role.CAREGIVER,
+          roleDefault: determinedRole,
           isActive: true,
           isSynthetic: false,
           supabaseId: authUser.id,
         },
       });
+
+      if (determinedRole === Role.PROTECTED_USER) {
+        await prisma.protectionSettings.upsert({
+          where: { elderId: dbUser.id },
+          create: {
+            elderId: dbUser.id,
+            currency: 'USD',
+            familyApprovalThreshold: new Decimal(100),
+            absoluteDailyCap: new Decimal(1000),
+            absoluteTransactionCap: new Decimal(500),
+            monthlyBudget: new Decimal(2000),
+            requireFamilyForNewRecipient: true,
+            requireFamilyForUnusual: true,
+            approvalTimeoutMinutes: 30,
+          },
+          update: {},
+        });
+      }
 
       // Audit Event
       try {
@@ -121,11 +167,12 @@ export async function GET(request: NextRequest) {
           data: {
             actorType: 'USER',
             actorId: dbUser.id,
-            eventType: 'CAREGIVER_EMAIL_VERIFIED',
+            eventType: determinedRole === Role.PROTECTED_USER ? 'ELDER_EMAIL_VERIFIED' : 'CAREGIVER_EMAIL_VERIFIED',
             metadata: {
               email: userEmail,
               supabaseId: authUser.id,
               authFlow: code ? 'pkce_code' : tokenHash ? 'token_hash' : 'session_fallback',
+              role: determinedRole,
               timestamp: new Date().toISOString(),
             },
           },
@@ -135,12 +182,12 @@ export async function GET(request: NextRequest) {
       }
     } else {
       // User exists in PostgreSQL:
-      // Guarantee that authenticating establishes them as an active CAREGIVER
+      // Guarantee that authenticating maintains their genuine role and activates them
       dbUser = await prisma.user.update({
         where: { id: dbUser.id },
         data: {
           supabaseId: authUser.id,
-          roleDefault: Role.CAREGIVER,
+          roleDefault: determinedRole,
           isActive: true,
           ...(userName && (!dbUser.fullName || dbUser.fullName.includes('Father') || dbUser.fullName.includes('Dad') || dbUser.fullName.includes('Thomas'))
             ? { fullName: userName }
@@ -148,29 +195,46 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      // Clear any pending/unconsented elder invitations where this email was entered
-      try {
-        await prisma.familyLink.deleteMany({
-          where: {
-            elderId: dbUser.id,
-            permission: {
-              canViewTransactions: false,
-            },
-          },
-        });
-      } catch (e) {
-        console.warn('Notice cleaning unconsented elder links:', e);
+      // If elder, activate their family link and permissions
+      if (determinedRole === Role.PROTECTED_USER) {
+        try {
+          await prisma.familyLink.updateMany({
+            where: { elderId: dbUser.id },
+            data: { status: FamilyLinkStatus.ACTIVE, consentedAt: new Date() },
+          });
+          await prisma.caregiverPermission.updateMany({
+            where: { familyLink: { elderId: dbUser.id } },
+            data: { canViewTransactions: true, canApprovePayments: true },
+          });
+        } catch (e) {
+          console.warn('Notice activating elder links:', e);
+        }
       }
     }
 
-    // 5. Determine destination: If caregiver has 0 linked elders, route to onboarding for profile & limits customization
-    const linkedEldersCount = await prisma.familyLink.count({
-      where: {
-        caregiverId: dbUser.id,
-      },
-    });
+    // Keep Supabase user metadata in sync with true role
+    try {
+      const adminSb = createAdminClient();
+      await adminSb.auth.admin.updateUserById(authUser.id, {
+        user_metadata: {
+          role: determinedRole,
+          is_elder: determinedRole === Role.PROTECTED_USER,
+        },
+      });
+    } catch (syncErr) {
+      console.warn('Supabase metadata sync notice on callback:', syncErr);
+    }
 
-    const targetUrl = linkedEldersCount === 0 ? `${origin}/onboarding` : `${origin}/dashboard`;
+    // 5. Determine destination:
+    // Protected elders go straight to /dashboard (Senior Shield).
+    // Caregivers with 0 linked elders go to /onboarding.
+    let targetUrl = `${origin}/dashboard`;
+    if (determinedRole === Role.CAREGIVER) {
+      const linkedEldersCount = await prisma.familyLink.count({
+        where: { caregiverId: dbUser.id },
+      });
+      targetUrl = linkedEldersCount === 0 ? `${origin}/onboarding` : `${origin}/dashboard`;
+    }
     response.headers.set('Location', targetUrl);
 
     // Issue SafePay session cookie directly on the redirect response!

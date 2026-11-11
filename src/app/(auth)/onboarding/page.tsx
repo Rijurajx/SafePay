@@ -108,6 +108,11 @@ export default function OnboardingPage() {
         }
         const data = await res.json();
         if (data.user) {
+          if (data.user.roleDefault === 'PROTECTED_USER') {
+            // Protected seniors do not onboard as caregivers - route to Senior Shield dashboard
+            window.location.href = '/dashboard';
+            return;
+          }
           setCaregiverEmail(data.user.email || '');
           setFullName(data.user.fullName || data.user.email?.split('@')[0] || '');
           if (data.user.phoneNumber) {

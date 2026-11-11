@@ -4,6 +4,8 @@ import { generateSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } fr
 import { verifyVerificationTicket } from '@/lib/auth-tokens';
 import { Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { Decimal } from '@prisma/client/runtime/library';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,19 +64,57 @@ export async function POST(req: NextRequest) {
       where: { email: verifiedEmail },
     });
 
+    // Check if user is linked as an elder
+    const isLinkedAsElder = await prisma.familyLink.findFirst({
+      where: {
+        OR: [
+          { elder: { email: verifiedEmail } },
+          ...(user?.id ? [{ elderId: user.id }] : []),
+        ],
+      },
+    });
+    const hasCaregiverLinks = user?.id
+      ? await prisma.familyLink.findFirst({ where: { caregiverId: user.id } })
+      : null;
+
+    let assignedRole: Role = Role.CAREGIVER;
+    if (user?.roleDefault === Role.PROTECTED_USER || (isLinkedAsElder && !hasCaregiverLinks)) {
+      assignedRole = Role.PROTECTED_USER;
+    } else if (user?.roleDefault) {
+      assignedRole = user.roleDefault;
+    }
+
     if (!user) {
-      // 3. Persist verified Caregiver account into database
+      // 3. Persist verified account into database
       user = await prisma.user.create({
         data: {
           email: verifiedEmail,
           fullName: verifiedFullName,
           passwordHash: userPasswordHash,
           supabaseId: supabaseId || null,
-          roleDefault: Role.CAREGIVER,
+          roleDefault: assignedRole,
           isActive: true,
           isSynthetic: false,
         },
       });
+
+      if (assignedRole === Role.PROTECTED_USER) {
+        await prisma.protectionSettings.upsert({
+          where: { elderId: user.id },
+          create: {
+            elderId: user.id,
+            currency: 'USD',
+            familyApprovalThreshold: new Decimal(100),
+            absoluteDailyCap: new Decimal(1000),
+            absoluteTransactionCap: new Decimal(500),
+            monthlyBudget: new Decimal(2000),
+            requireFamilyForNewRecipient: true,
+            requireFamilyForUnusual: true,
+            approvalTimeoutMinutes: 30,
+          },
+          update: {},
+        });
+      }
 
       // 4. Record Audit Event
       try {
@@ -82,11 +122,12 @@ export async function POST(req: NextRequest) {
           data: {
             actorType: 'USER',
             actorId: user.id,
-            eventType: 'CAREGIVER_EMAIL_VERIFIED',
+            eventType: assignedRole === Role.PROTECTED_USER ? 'ELDER_EMAIL_VERIFIED' : 'CAREGIVER_EMAIL_VERIFIED',
             metadata: {
               email: verifiedEmail,
               fullName: verifiedFullName,
               supabaseId: supabaseId || null,
+              role: assignedRole,
               verifiedAt: new Date().toISOString(),
             },
           },
@@ -95,17 +136,30 @@ export async function POST(req: NextRequest) {
         console.warn('Audit event creation failed:', auditErr);
       }
     } else {
-      // Update existing record to guarantee CAREGIVER role & active status
+      // Update existing record, PRESERVING genuine role
       user = await prisma.user.update({
         where: { id: user.id },
         data: {
-          roleDefault: Role.CAREGIVER,
+          roleDefault: assignedRole,
           isActive: true,
           ...(supabaseId ? { supabaseId } : {}),
           ...(userPasswordHash ? { passwordHash: userPasswordHash } : {}),
           ...(verifiedFullName ? { fullName: verifiedFullName } : {}),
         },
       });
+    }
+
+    // Keep Supabase user metadata in sync with true role
+    try {
+      const adminSb = createAdminClient();
+      await adminSb.auth.admin.updateUserById(supabaseId || user.supabaseId || user.id, {
+        user_metadata: {
+          role: assignedRole,
+          is_elder: assignedRole === Role.PROTECTED_USER,
+        },
+      });
+    } catch (syncErr) {
+      console.warn('Supabase metadata sync notice on verify-email:', syncErr);
     }
 
     // 5. Generate signed HTTP-only session token

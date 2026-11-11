@@ -12,17 +12,36 @@ export async function POST(req: NextRequest) {
 
     const normalizedEmail = String(email).trim().toLowerCase();
 
-    // 1. Find or create caregiver via Google OAuth profile
+    // 1. Find or create user via Google OAuth profile
     let user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
     });
+
+    const isLinkedAsElder = await prisma.familyLink.findFirst({
+      where: {
+        OR: [
+          { elder: { email: normalizedEmail } },
+          ...(user?.id ? [{ elderId: user.id }] : []),
+        ],
+      },
+    });
+    const hasCaregiverLinks = user?.id
+      ? await prisma.familyLink.findFirst({ where: { caregiverId: user.id } })
+      : null;
+
+    let determinedRole: Role = Role.CAREGIVER;
+    if (user?.roleDefault === Role.PROTECTED_USER || (isLinkedAsElder && !hasCaregiverLinks)) {
+      determinedRole = Role.PROTECTED_USER;
+    } else if (user?.roleDefault) {
+      determinedRole = user.roleDefault;
+    }
 
     if (!user) {
       user = await prisma.user.create({
         data: {
           email: normalizedEmail,
           fullName: String(fullName).trim(),
-          roleDefault: Role.CAREGIVER,
+          roleDefault: determinedRole,
           isActive: true,
           isSynthetic: false,
         },
@@ -34,10 +53,11 @@ export async function POST(req: NextRequest) {
           data: {
             actorType: 'USER',
             actorId: user.id,
-            eventType: 'CAREGIVER_GOOGLE_OAUTH_REGISTERED',
+            eventType: determinedRole === Role.PROTECTED_USER ? 'ELDER_GOOGLE_OAUTH_REGISTERED' : 'CAREGIVER_GOOGLE_OAUTH_REGISTERED',
             metadata: {
               email: normalizedEmail,
               provider: 'google',
+              role: determinedRole,
               timestamp: new Date().toISOString(),
             },
           },
@@ -45,6 +65,14 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         console.warn('Audit log write error:', e);
       }
+    } else {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          roleDefault: determinedRole,
+          isActive: true,
+        },
+      });
     }
 
     // 2. Issue session token

@@ -5,6 +5,7 @@ import { generateSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } fr
 import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { Role, FamilyLinkStatus } from '@prisma/client';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,8 +63,43 @@ export async function POST(req: NextRequest) {
           passwordHash,
           isActive: true,
           fullName: payload.elderFullName,
+          roleDefault: Role.PROTECTED_USER,
         },
       });
+    }
+
+    // Sync credentials & role into Supabase Auth
+    try {
+      const adminSb = createAdminClient();
+      const { data: supaUsers } = await adminSb.auth.admin.listUsers();
+      const existingSupaElder = supaUsers?.users?.find(
+        (u) => u.email?.toLowerCase() === payload.elderEmailOrPhone.toLowerCase()
+      );
+
+      if (existingSupaElder) {
+        await adminSb.auth.admin.updateUserById(existingSupaElder.id, {
+          password,
+          email_confirm: true,
+          user_metadata: {
+            role: 'PROTECTED_USER',
+            is_elder: true,
+            full_name: payload.elderFullName,
+          },
+        });
+      } else {
+        await adminSb.auth.admin.createUser({
+          email: payload.elderEmailOrPhone.toLowerCase(),
+          password,
+          email_confirm: true,
+          user_metadata: {
+            role: 'PROTECTED_USER',
+            is_elder: true,
+            full_name: payload.elderFullName,
+          },
+        });
+      }
+    } catch (syncErr) {
+      console.warn('Notice syncing Supabase credentials for accepted senior:', syncErr);
     }
 
     // 3. Grant active FamilyLink with recorded consent timestamp
