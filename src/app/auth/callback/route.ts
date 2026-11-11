@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
         'This verification link is invalid or has expired. If you already verified, please sign in. Otherwise, please sign up again to receive a fresh verification link.';
     }
 
-    return NextResponse.redirect(`${origin}/auth/signin?error=${encodeURIComponent(friendlyMessage)}`);
+    return NextResponse.redirect(`${origin}/signin?error=${encodeURIComponent(friendlyMessage)}`);
   }
 
   // Pre-create the redirect response so all cookies (both Supabase and SafePay) are explicitly stamped onto it
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
       if (error) {
         console.error('Supabase token verification error:', error);
         return NextResponse.redirect(
-          `${origin}/auth/signin?error=${encodeURIComponent('The email verification link has expired or was already used.')}`
+          `${origin}/signin?error=${encodeURIComponent('The email verification link has expired or was already used.')}`
         );
       }
       authUser = data?.user;
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
 
     if (!authUser?.email) {
       return NextResponse.redirect(
-        `${origin}/auth/signin?error=${encodeURIComponent('Could not verify email. Please try signing in or requesting a new confirmation link.')}`
+        `${origin}/signin?error=${encodeURIComponent('Could not verify email. Please try signing in or requesting a new confirmation link.')}`
       );
     }
 
@@ -170,7 +170,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const targetUrl = linkedEldersCount === 0 ? `${origin}/auth/onboarding` : `${origin}/dashboard`;
+    const targetUrl = linkedEldersCount === 0 ? `${origin}/onboarding` : `${origin}/dashboard`;
     response.headers.set('Location', targetUrl);
 
     // Issue SafePay session cookie directly on the redirect response!
@@ -186,6 +186,6 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (err) {
     console.error('Callback unexpected error:', err);
-    return NextResponse.redirect(`${origin}/auth/signin?error=Failed to process authentication`);
+    return NextResponse.redirect(`${origin}/signin?error=Failed to process authentication`);
   }
 }

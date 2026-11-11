@@ -149,63 +149,55 @@ export function evaluateTransactionRisk(params: EvaluateRiskParams): Determinist
     });
   }
 
-  // 5. RULE: Family Approval Threshold
+  // 5. RULE: Family Approval Hold Limit
   if (amount > familyApprovalThreshold) {
     requiresFamilyApproval = true;
     hasUnusualSignal = true;
-    riskScore += 25;
+    riskScore += 35;
     signals.push({
       code: 'EXCEEDS_FAMILY_THRESHOLD',
       severity: 'MEDIUM',
-      message: `Amount ($${amount.toFixed(2)}) exceeds family notification threshold ($${familyApprovalThreshold.toFixed(2)})`,
+      message: `Amount ($${amount.toFixed(2)}) exceeds set hold limit ($${familyApprovalThreshold.toFixed(2)})`,
       metadata: { amount, threshold: familyApprovalThreshold },
     });
   }
 
-  // 6. RULE: Recipient Familiarity & Trust
+  // 6. Informative Check: Recipient Familiarity & Trust (Informational only; does not hold if within limits)
   const isFirstTimeMerchant = !recipient.isTrusted && !recipient.lastPaidAt;
-  if (isFirstTimeMerchant && protectionSettings.requireFamilyForNewRecipient) {
-    requiresFamilyApproval = true;
-    hasUnusualSignal = true;
-    riskScore += 20;
+  if (isFirstTimeMerchant) {
+    riskScore += 10;
     signals.push({
       code: 'NEW_RECIPIENT',
-      severity: 'MEDIUM',
-      message: `First transaction with unverified merchant: "${recipient.merchantName}" (${recipient.category})`,
+      severity: 'LOW',
+      message: `First transaction with merchant: "${recipient.merchantName}" (${recipient.category})`,
       metadata: { merchantName: recipient.merchantName, category: recipient.category, isTrusted: recipient.isTrusted },
     });
   }
 
-  // 5. RULE: Adaptive Baseline Statistical Deviation (Modified Z-Score via Median + MAD)
+  // 7. Informative Check: Adaptive Baseline Statistical Deviation
   if (spendingBaseline) {
     const median = Number(spendingBaseline.medianTransaction.toString());
     const rawMad = Number(spendingBaseline.madTransaction.toString());
-    // Safe floor for MAD to prevent division by zero in homogenous datasets
     const mad = Math.max(rawMad, 5.0);
 
-    // Modified Z-Score: 0.6745 * (amount - median) / MAD
     const modifiedZ = (0.6745 * (amount - median)) / mad;
 
     if (modifiedZ >= 3.5 || (median > 0 && amount >= median * 3)) {
       hasUnusualSignal = true;
-      if (protectionSettings.requireFamilyForUnusual) {
-        requiresFamilyApproval = true;
-      }
-      const scoreBump = Math.min(30, Math.max(15, Math.round(modifiedZ * 5)));
+      const scoreBump = Math.min(20, Math.max(10, Math.round(modifiedZ * 3)));
       riskScore += scoreBump;
       signals.push({
         code: 'HIGH_VARIANCE_FROM_MEDIAN',
-        severity: 'MEDIUM',
-        message: `Transaction is significantly higher than regular spending (typical median: $${median.toFixed(2)}, variance Z: ${modifiedZ.toFixed(1)})`,
+        severity: 'LOW',
+        message: `Transaction is higher than regular spending median ($${median.toFixed(2)})`,
         metadata: { amount, median, mad, modifiedZ: Number(modifiedZ.toFixed(2)) },
       });
     }
 
-    // 6. RULE: Unusual Time-of-Day Check
+    // 8. Informative Check: Unusual Time-of-Day Check
     const hour = transactionTime.getHours();
     if (hour < spendingBaseline.usualStartHour || hour > spendingBaseline.usualEndHour) {
-      hasUnusualSignal = true;
-      riskScore += 15;
+      riskScore += 5;
       signals.push({
         code: 'UNUSUAL_TIME_OF_DAY',
         severity: 'LOW',
@@ -215,13 +207,12 @@ export function evaluateTransactionRisk(params: EvaluateRiskParams): Determinist
     }
   }
 
-  // 7. RULE: High Velocity Anomaly Check
+  // 9. Informative Check: High Velocity Check
   if (recentTransactionsCount >= 3) {
-    hasUnusualSignal = true;
-    riskScore += 20;
+    riskScore += 10;
     signals.push({
       code: 'RAPID_SPENDING_VELOCITY',
-      severity: 'MEDIUM',
+      severity: 'LOW',
       message: `High frequency: ${recentTransactionsCount + 1} transactions initiated in a short window`,
       metadata: { recentTransactionsCount },
     });

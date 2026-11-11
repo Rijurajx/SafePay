@@ -35,6 +35,10 @@ import {
   Sun,
   Moon,
   Mic,
+  Menu,
+  ReceiptText,
+  Play,
+  CreditCard,
 } from 'lucide-react';
 import { SessionUser, DemoPersonaKey } from '@/types';
 import { createClient } from '@/lib/supabase/client';
@@ -151,6 +155,13 @@ interface RecentPayment {
   merchantName: string;
   category: string;
   createdAt: string;
+  riskScore?: number | null;
+  explanation?: {
+    summary?: string;
+    seniorExplanation?: string;
+    seniorMessage?: string;
+    caregiverExplanation?: string;
+  } | null;
 }
 
 interface SeniorGuardian {
@@ -311,6 +322,31 @@ export default function DashboardPage() {
   const [seniorLimitSubmitting, setSeniorLimitSubmitting] = useState(false);
   const [seniorLimitSuccess, setSeniorLimitSuccess] = useState<string | null>(null);
 
+  // Senior Navigation & Simulation States
+  const [seniorTab, setSeniorTab] = useState<'profile' | 'ledger'>('profile');
+  const [seniorSidebarCollapsed, setSeniorSidebarCollapsed] = useState(false);
+  const [seniorMobileMenuOpen, setSeniorMobileMenuOpen] = useState(false);
+  const [seniorLedgerFilter, setSeniorLedgerFilter] = useState<'ALL' | 'APPROVED' | 'WAITING' | 'DECLINED'>('ALL');
+  const [isCustomCheckoutOpen, setIsCustomCheckoutOpen] = useState(false);
+
+  // Custom demo checkout states
+  const [customMerchant, setCustomMerchant] = useState('Whole Foods Market');
+  const [customAmount, setCustomAmount] = useState('64.50');
+  const [customCategory, setCustomCategory] = useState('Groceries');
+  const [customNote, setCustomNote] = useState('Weekly grocery shopping');
+  const [customAutoSettle, setCustomAutoSettle] = useState(true);
+  const [customSimulating, setCustomSimulating] = useState(false);
+  const [customSimResult, setCustomSimResult] = useState<{
+    status: string;
+    riskScore?: number;
+    paymentRequestId?: string;
+    isSettled?: boolean;
+    payPalCaptureId?: string | null;
+    seniorMessage?: string;
+    requiresFamilyApproval?: boolean;
+    blockingReason?: string;
+  } | null>(null);
+
   // Profile edit modal state
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileName, setProfileName] = useState('');
@@ -354,7 +390,7 @@ export default function DashboardPage() {
         },
       });
       if (res.status === 401) {
-        window.location.href = '/auth/signin';
+        window.location.href = '/signin';
         return;
       }
       const data = await res.json();
@@ -592,7 +628,7 @@ export default function DashboardPage() {
       await supabase.auth.signOut();
     } catch {}
     await fetch('/api/auth/logout', { method: 'POST' });
-    window.location.href = '/auth/signin';
+    window.location.href = '/signin';
   };
 
   const handleDecision = async (approvalId: string, decision: 'APPROVED' | 'DECLINED') => {
@@ -830,6 +866,109 @@ export default function DashboardPage() {
     }
   };
 
+  // Senior Ledger Filters & Counts
+  const seniorFilteredPayments = useMemo(() => {
+    return seniorRecentPayments.filter((p) => {
+      if (seniorLedgerFilter === 'ALL') return true;
+      if (seniorLedgerFilter === 'APPROVED') {
+        return ['SETTLED', 'APPROVED_FOR_CHECKOUT', 'READY_FOR_CHECKOUT'].includes(p.status);
+      }
+      if (seniorLedgerFilter === 'WAITING') {
+        return ['AWAITING_FAMILY', 'CAPTURE_PENDING', 'CHECKOUT_IN_PROGRESS'].includes(p.status);
+      }
+      if (seniorLedgerFilter === 'DECLINED') {
+        return [
+          'DECLINED_BY_FAMILY',
+          'BLOCKED_BY_POLICY',
+          'EXPIRED',
+          'CANCELLED_BY_USER',
+          'CAPTURE_FAILED',
+        ].includes(p.status);
+      }
+      return true;
+    });
+  }, [seniorRecentPayments, seniorLedgerFilter]);
+
+  const seniorApprovedCount = useMemo(() => {
+    return seniorRecentPayments.filter((p) =>
+      ['SETTLED', 'APPROVED_FOR_CHECKOUT', 'READY_FOR_CHECKOUT'].includes(p.status)
+    ).length;
+  }, [seniorRecentPayments]);
+
+  const seniorWaitingCount = useMemo(() => {
+    return seniorRecentPayments.filter((p) =>
+      ['AWAITING_FAMILY', 'CAPTURE_PENDING', 'CHECKOUT_IN_PROGRESS'].includes(p.status)
+    ).length;
+  }, [seniorRecentPayments]);
+
+  const seniorDeclinedCount = useMemo(() => {
+    return seniorRecentPayments.filter((p) =>
+      ['DECLINED_BY_FAMILY', 'BLOCKED_BY_POLICY', 'EXPIRED', 'CANCELLED_BY_USER', 'CAPTURE_FAILED'].includes(p.status)
+    ).length;
+  }, [seniorRecentPayments]);
+
+  const handleRunDemoSimulation = async (params: {
+    merchantName: string;
+    amount: number;
+    category: string;
+    autoSettle?: boolean;
+  }) => {
+    setCustomSimulating(true);
+    setCustomSimResult(null);
+    try {
+      const res = await fetch('/api/risk/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          elderId: currentUser?.id,
+          amount: params.amount,
+          merchantName: params.merchantName,
+          category: params.category,
+          autoSettle: params.autoSettle ?? true,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Simulation failed');
+      }
+
+      setCustomSimResult({
+        status: data.status,
+        riskScore: data.riskScore,
+        paymentRequestId: data.paymentRequestId,
+        isSettled: data.isSettled,
+        payPalCaptureId: data.payPalCaptureId,
+        seniorMessage:
+          data.explanation?.seniorExplanation ||
+          data.explanation?.seniorMessage ||
+          (data.status === 'SETTLED'
+            ? 'Payment was safely approved and settled via PayPal Sandbox.'
+            : data.status === 'AWAITING_FAMILY'
+            ? 'SafePay placed this charge on hold to check in with your family.'
+            : 'Payment was blocked by SafePay protection rules.'),
+        requiresFamilyApproval: data.requiresFamilyApproval,
+        blockingReason: data.blockingReason,
+      });
+
+      await fetchSummary();
+
+      setActionNotice({
+        message:
+          data.status === 'SETTLED'
+            ? `Demo checkout approved! $${params.amount.toFixed(2)} deducted from daily and monthly caps.`
+            : data.status === 'AWAITING_FAMILY'
+            ? `Demo checkout held for family review ($${params.amount.toFixed(2)}).`
+            : `Demo checkout flagged: ${data.blockingReason || 'Blocked by policy'}`,
+        type: data.status === 'SETTLED' ? 'success' : 'info',
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Simulation error';
+      setActionNotice({ message: msg, type: 'error' });
+    } finally {
+      setCustomSimulating(false);
+    }
+  };
+
   // Filtered transactions for the ledger view
   const filteredLedger = useMemo(() => {
     return ledgerItems.filter((item) => {
@@ -869,319 +1008,953 @@ export default function DashboardPage() {
   }
 
   /* =========================================================================
-     PROTECTED USER (SENIOR) VIEW
+     PROTECTED USER (SENIOR) VIEW (WITH LEFT SIDEBAR & LEDGER SIMULATION)
      ========================================================================= */
   if (role === 'PROTECTED_USER') {
     return (
-      <div className="min-h-screen soft-mesh-bg text-[#0a0c10] font-sans selection:bg-purple-100 selection:text-purple-900 pb-20">
-        <header className="sticky top-4 z-40 px-4 sm:px-6 max-w-5xl mx-auto">
-          <div className="liquid-glass rounded-full px-5 py-2.5 flex items-center justify-between border border-white/80 shadow-sm">
-            <Link href="/" className="flex items-center gap-2 group">
-              <div className="w-7 h-7 rounded-full bg-slate-950 text-white flex items-center justify-center shadow-xs">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              </div>
+      <div className="min-h-screen soft-mesh-bg text-slate-900 flex flex-col md:flex-row antialiased selection:bg-purple-100 selection:text-purple-900">
+        {/* MOBILE TOP BAR */}
+        <div className="md:hidden flex items-center justify-between p-4 bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-40">
+          <Link href="/" className="flex items-center gap-2 group">
+            <div className="w-8 h-8 rounded-xl bg-slate-950 text-white flex items-center justify-center shadow-xs">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div>
               <span className="font-bold tracking-tight text-sm text-slate-950">SafePay</span>
-              <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                Senior Shield
+              <span className="ml-1.5 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                Senior
               </span>
-            </Link>
+            </div>
+          </Link>
 
-            <div className="flex items-center gap-3">
-              {currentUser && (
-                <div className="text-xs font-semibold text-slate-700 px-2.5 py-1 rounded-full bg-white/80 border border-slate-200">
-                  {currentUser.fullName}
+          <button
+            onClick={() => setSeniorMobileMenuOpen((prev) => !prev)}
+            className="p-2 rounded-xl text-slate-600 hover:text-slate-950 hover:bg-slate-100 transition-colors"
+          >
+            {seniorMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
+
+        {/* SENIOR LEFT SIDEBAR */}
+        <aside
+          className={`shrink-0 border-r border-slate-200/80 bg-white/80 backdrop-blur-xl transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col justify-between z-30 select-none md:h-screen md:sticky md:top-0 ${
+            seniorMobileMenuOpen ? 'flex' : 'hidden md:flex'
+          } ${seniorSidebarCollapsed ? 'w-full md:w-20' : 'w-full md:w-64'}`}
+        >
+          {/* Floating Edge Collapse / Expand Toggle Button on Desktop */}
+          <button
+            onClick={() => setSeniorSidebarCollapsed((prev) => !prev)}
+            className="hidden md:flex absolute -right-3 top-5 w-6 h-6 rounded-full bg-white border border-slate-200/90 shadow-md items-center justify-center text-slate-500 hover:text-slate-950 hover:scale-110 active:scale-95 transition-all z-40"
+            title={seniorSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+          >
+            {seniorSidebarCollapsed ? (
+              <ChevronRight className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronLeft className="w-3.5 h-3.5" />
+            )}
+          </button>
+
+          {/* Top Brand & Shield Status */}
+          <div>
+            <div className={`border-b border-slate-100 transition-all ${seniorSidebarCollapsed ? 'p-3 flex justify-center' : 'p-4'}`}>
+              <Link href="/" className="flex items-center gap-2.5 overflow-hidden group">
+                <div className="w-9 h-9 rounded-2xl bg-slate-950 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+                  <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
                 </div>
-              )}
+                {!seniorSidebarCollapsed && (
+                  <div className="flex flex-col overflow-hidden whitespace-nowrap">
+                    <span className="font-bold tracking-tight text-sm text-slate-950 leading-tight">SafePay</span>
+                    <span className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wider">
+                      Senior Shield
+                    </span>
+                  </div>
+                )}
+              </Link>
+            </div>
+
+            {/* Sidebar Navigation Items */}
+            <nav className={`space-y-1.5 flex-1 ${seniorSidebarCollapsed ? 'p-2' : 'p-3'}`}>
+              {/* Option 1: My Profile */}
+              <button
+                onClick={() => {
+                  setSeniorTab('profile');
+                  setSeniorMobileMenuOpen(false);
+                }}
+                className={`transition-all font-semibold text-xs ${
+                  seniorSidebarCollapsed
+                    ? 'w-11 h-11 mx-auto flex items-center justify-center rounded-2xl relative'
+                    : 'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl'
+                } ${
+                  seniorTab === 'profile'
+                    ? 'bg-slate-950 text-white shadow-md shadow-slate-950/10'
+                    : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/80'
+                }`}
+                title="My Profile & Safeguards"
+              >
+                <User className={`w-4 h-4 shrink-0 ${seniorTab === 'profile' ? 'text-emerald-400' : 'text-slate-500'}`} />
+                {!seniorSidebarCollapsed && (
+                  <div className="flex-1 text-left flex items-center justify-between">
+                    <span>My Profile</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">
+                      Shield
+                    </span>
+                  </div>
+                )}
+              </button>
+
+              {/* Option 2: Ledger & Simulation */}
+              <button
+                onClick={() => {
+                  setSeniorTab('ledger');
+                  setSeniorMobileMenuOpen(false);
+                }}
+                className={`transition-all font-semibold text-xs ${
+                  seniorSidebarCollapsed
+                    ? 'w-11 h-11 mx-auto flex items-center justify-center rounded-2xl relative'
+                    : 'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl'
+                } ${
+                  seniorTab === 'ledger'
+                    ? 'bg-slate-950 text-white shadow-md shadow-slate-950/10'
+                    : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/80'
+                }`}
+                title="Ledger & PayPal Simulation"
+              >
+                <ReceiptText className={`w-4 h-4 shrink-0 ${seniorTab === 'ledger' ? 'text-purple-400' : 'text-slate-500'}`} />
+                {!seniorSidebarCollapsed && (
+                  <div className="flex-1 text-left flex items-center justify-between">
+                    <span>Ledger</span>
+                    {seniorHolds.length > 0 ? (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-white animate-pulse">
+                        {seniorHolds.length} Hold
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                        {seniorRecentPayments.length}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {seniorSidebarCollapsed && seniorHolds.length > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white animate-pulse" />
+                )}
+              </button>
+            </nav>
+          </div>
+
+          {/* Bottom Senior Profile Card & Sign Out */}
+          <div className={`p-3 border-t border-slate-100 ${seniorSidebarCollapsed ? 'flex flex-col items-center gap-2' : ''}`}>
+            {!seniorSidebarCollapsed ? (
+              <div className="p-2.5 rounded-2xl bg-white/90 border border-slate-200/80 shadow-2xs space-y-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                    {currentUser?.fullName?.charAt(0) || 'T'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-slate-900 truncate">{currentUser?.fullName || 'Senior'}</p>
+                    <p className="text-[10px] text-emerald-700 font-semibold truncate flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Protected Senior
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="w-full py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            ) : (
               <button
                 onClick={handleLogout}
-                className="p-1.5 text-slate-400 hover:text-slate-900 rounded-full transition-colors"
+                className="w-10 h-10 rounded-2xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors"
                 title="Sign Out"
               >
                 <LogOut className="w-4 h-4" />
               </button>
-            </div>
-          </div>
-        </header>
-
-        <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-8 space-y-8">
-          {/* Senior Profile & Safeguards */}
-          <div className="liquid-glass rounded-3xl p-6 sm:p-7 border border-white/80 shadow-[0_16px_40px_-12px_rgba(15,23,42,0.08)] space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shadow-2xs">
-                  <User className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-slate-950">Your Senior Profile &amp; Safeguards</h2>
-                  <p className="text-xs text-slate-500">Protected family member account</p>
-                </div>
-              </div>
-              <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1.5 shadow-2xs">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Shield Active
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div className="p-3.5 bg-white/70 rounded-2xl border border-black/5 space-y-1">
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Your Full Name</span>
-                <span className="font-extrabold text-slate-900 text-sm block">{currentUser?.fullName}</span>
-                <span className="text-[10px] text-emerald-700 font-semibold block">Protected Senior Account</span>
-              </div>
-              <div className="p-3.5 bg-white/70 rounded-2xl border border-black/5 space-y-1">
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Account Contact</span>
-                <span className="font-mono text-slate-800 text-xs truncate block">{currentUser?.email}</span>
-                <span className="text-[10px] text-slate-500 block truncate">
-                  {currentUser?.phoneNumber ? `Mobile: ${currentUser.phoneNumber}` : 'SSO Verified'}
-                </span>
-              </div>
-              <div className="p-3.5 bg-white/70 rounded-2xl border border-black/5 space-y-1">
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Primary Family Guardian</span>
-                <span className="font-bold text-purple-900 text-xs block truncate">
-                  {seniorGuardians.length > 0
-                    ? `${seniorGuardians[0].fullName} (${seniorGuardians[0].relationship})`
-                    : 'Caregiver Linked'}
-                </span>
-                <span className="font-mono text-slate-500 text-[10px] block truncate">
-                  {seniorGuardians.length > 0 ? seniorGuardians[0].email : 'Connected Guardian'}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-xs">
-              <div className="p-2.5 bg-white/60 rounded-xl border border-black/5 flex items-center justify-between">
-                <div>
-                  <span className="text-[9px] text-slate-500 font-semibold uppercase block">Monthly Budget</span>
-                  <span className="font-bold text-slate-900 text-xs">${seniorMonthlyBudget.toLocaleString()}</span>
-                </div>
-                <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full font-bold">Planned</span>
-              </div>
-
-              <div className="p-2.5 bg-white/60 rounded-xl border border-black/5 flex items-center justify-between">
-                <div>
-                  <span className="text-[9px] text-slate-500 font-semibold uppercase block">Home Baseline</span>
-                  <span className="font-bold text-slate-900 text-xs flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-slate-400" />
-                    <span>{currentUser?.city ? `${currentUser.city} ${currentUser.primaryZipCode || ''}` : 'Local Region'}</span>
-                  </span>
-                </div>
-                <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold">AI Active</span>
-              </div>
-
-              <div className="p-2.5 bg-white/60 rounded-xl border border-black/5 flex items-center justify-between">
-                <div>
-                  <span className="text-[9px] text-slate-500 font-semibold uppercase block">Emergency Backup</span>
-                  <span className="font-bold text-slate-900 text-xs truncate block">
-                    {currentUser?.emergencyContactName ? `${currentUser.emergencyContactName}` : 'Family Guardian'}
-                  </span>
-                </div>
-                <Heart className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-              </div>
-            </div>
-          </div>
-
-          {/* Warm Welcome Card */}
-          <div className="liquid-glass rounded-3xl p-8 border border-white/80 shadow-[0_20px_50px_-16px_rgba(15,23,42,0.1)] space-y-5">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shadow-xs">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-950">
-                  Welcome back, {currentUser?.fullName || 'Thomas'}
-                </h1>
-                <p className="text-sm font-semibold text-emerald-800">
-                  Your SafePay Shield is active and safeguarding your PayPal transactions.
-                </p>
-              </div>
-            </div>
-
-            {/* Family Caregiver Safeguards Reassurance */}
-            <div className="bg-white/70 rounded-2xl p-5 border border-black/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Your Family Guardians
-                </div>
-                <p className="text-sm text-slate-800 font-medium">
-                  {seniorGuardians.length > 0
-                    ? `${seniorGuardians.map((g) => `${g.fullName} (${g.relationship})`).join(', ')} are actively linked to safeguard your spending.`
-                    : 'Your family caregivers are linked to confirm unusual or large payments.'}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-900 border border-purple-200">
-                  Review Threshold: ${seniorFamilyThreshold.toFixed(0)}
-                </span>
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">
-                  Daily Cap: ${seniorDailyCap.toFixed(0)}
-                </span>
-              </div>
-            </div>
-
-            {/* Pending Limit Request Banner if any */}
-            {seniorPendingLimitRequests.length > 0 && (
-              <div className="p-4 rounded-2xl bg-purple-50/90 border border-purple-200 text-purple-950 flex items-start justify-between gap-3 text-xs">
-                <div className="flex items-start gap-2.5">
-                  <Clock className="w-4 h-4 text-purple-600 mt-0.5 shrink-0 animate-pulse" />
-                  <div>
-                    <span className="font-bold text-purple-900 block">
-                      Limit Increase Request Pending Review
-                    </span>
-                    <p className="text-purple-800 text-[11px] mt-0.5">
-                      You requested +${seniorPendingLimitRequests[0].requestedAmount.toFixed(0)} {seniorPendingLimitRequests[0].limitType.toLowerCase()} allowance
-                      {seniorPendingLimitRequests[0].reason ? ` for "${seniorPendingLimitRequests[0].reason}"` : ''}. Your family guardian has been notified.
-                    </p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-200 text-purple-900 shrink-0">
-                  Awaiting Guardian
-                </span>
-              </div>
             )}
-
-            {/* Decreasing Caps & Balances Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-              {/* Daily Remaining Cap */}
-              <div className="liquid-glass-subtle rounded-2xl p-5 border border-white space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Remaining Today</span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                    Daily
-                  </span>
-                </div>
-                <div className="text-2xl sm:text-3xl font-black text-slate-950">
-                  ${seniorRemainingDailyCap.toFixed(2)}
-                </div>
-                <div className="w-full bg-slate-200/80 rounded-full h-1.5 overflow-hidden">
-                  <div
-                    className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(100, (seniorTodaySpend / Math.max(1, seniorDailyCap)) * 100)}%` }}
-                  />
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  ${seniorTodaySpend.toFixed(2)} spent of ${seniorDailyCap.toFixed(2)} daily cap
-                </p>
-              </div>
-
-              {/* Monthly Remaining Budget */}
-              <div className="liquid-glass-subtle rounded-2xl p-5 border border-white space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Remaining Month</span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
-                    Monthly
-                  </span>
-                </div>
-                <div className="text-2xl sm:text-3xl font-black text-slate-950">
-                  ${seniorRemainingMonthlyBudget.toFixed(2)}
-                </div>
-                <div className="w-full bg-slate-200/80 rounded-full h-1.5 overflow-hidden">
-                  <div
-                    className="bg-blue-500 h-1.5 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(100, (seniorMonthSpend / Math.max(1, seniorMonthlyBudget)) * 100)}%` }}
-                  />
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  ${seniorMonthSpend.toFixed(2)} spent of ${seniorMonthlyBudget.toFixed(2)} limit
-                </p>
-              </div>
-
-              {/* Actions: Request Limit or Checkout */}
-              <div className="liquid-glass-subtle rounded-2xl p-5 border border-white flex flex-col justify-between space-y-3">
-                <div>
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Need Additional Funds?</span>
-                  <p className="text-[11px] text-slate-600 font-medium mt-1">
-                    Request an instant limit increase from your linked caregivers.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <button
-                    onClick={() => setIsSeniorLimitModalOpen(true)}
-                    className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-purple-200" />
-                    <span>Request Limit Increase</span>
-                  </button>
-                  <Link
-                    href="/checkout"
-                    className="w-full py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 active:scale-95"
-                  >
-                    <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Protected Checkout</span>
-                  </Link>
-                </div>
-              </div>
-            </div>
           </div>
+        </aside>
 
-          {/* Active Holds Section */}
-          {seniorHolds.length > 0 && (
-            <div className="liquid-glass rounded-3xl p-7 border border-amber-200 shadow-md space-y-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center">
-                  <Clock className="w-4 h-4" />
-                </div>
-                <h2 className="text-lg font-bold text-slate-950">We&apos;re Checking In With Your Family</h2>
-              </div>
-
-              {seniorHolds.map((hold) => (
-                <div key={hold.id} className="bg-white/90 rounded-2xl p-5 border border-amber-100 shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-base font-bold text-slate-900">{hold.merchantName}</div>
-                      <div className="text-xs text-slate-500">{hold.category}</div>
-                    </div>
-                    <div className="text-xl font-extrabold text-slate-950">${hold.amount.toFixed(2)}</div>
-                  </div>
-                  <p className="text-xs text-slate-700 font-medium bg-amber-50/70 p-3 rounded-xl border border-amber-100/60 leading-relaxed">
-                    {hold.seniorMessage}
-                  </p>
-                </div>
-              ))}
+        {/* MAIN SENIOR CONTENT AREA */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-8 max-w-6xl mx-auto w-full space-y-8">
+          {/* Action Notice Toast */}
+          {actionNotice && (
+            <div
+              className={`p-4 rounded-2xl border text-xs font-semibold flex items-center justify-between shadow-sm animate-in fade-in duration-200 ${
+                actionNotice.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                  : actionNotice.type === 'error'
+                  ? 'bg-rose-50 border-rose-200 text-rose-900'
+                  : 'bg-purple-50 border-purple-200 text-purple-900'
+              }`}
+            >
+              <span>{actionNotice.message}</span>
+              <button onClick={() => setActionNotice(null)} className="ml-3 text-slate-400 hover:text-slate-600">
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
           )}
 
-          {/* Recent Purchases */}
-          <div className="liquid-glass rounded-3xl p-7 border border-white/80 shadow-sm space-y-4">
-            <h2 className="text-lg font-bold text-slate-950">Recent Purchases</h2>
-            {seniorRecentPayments.length === 0 ? (
-              <div className="text-center py-6 text-xs text-slate-500">
-                No purchases recorded yet today. Routine transactions will appear here.
-              </div>
-            ) : (
-              <div className="divide-y divide-black/5">
-                {seniorRecentPayments.map((p) => (
-                  <div key={p.id} className="py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center">
-                        <Store className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-slate-900">{p.merchantName}</div>
-                        <div className="text-[11px] text-slate-500">
-                          {new Date(p.createdAt).toLocaleDateString()} • {p.category}
-                        </div>
-                      </div>
+          {/* =================================================================
+              TAB 1: MY PROFILE (ELDER'S PROFILE, CAPS, LIMIT REQUEST)
+              ================================================================= */}
+          {seniorTab === 'profile' && (
+            <div className="space-y-6">
+              {/* Senior Welcome Banner */}
+              <div className="liquid-glass rounded-3xl p-6 sm:p-8 border border-white/80 shadow-[0_20px_50px_-16px_rgba(15,23,42,0.1)] space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shadow-xs">
+                      <ShieldCheck className="w-7 h-7" />
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs font-bold text-slate-950">${p.amount.toFixed(2)}</div>
-                      <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          p.status === 'SETTLED'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : p.status === 'AWAITING_FAMILY'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-rose-100 text-rose-800'
-                        }`}
-                      >
-                        {p.status}
-                      </span>
+                    <div>
+                      <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-950">
+                        Welcome back, {currentUser?.fullName || 'Thomas'}
+                      </h1>
+                      <p className="text-xs sm:text-sm font-semibold text-emerald-800">
+                        Your SafePay Shield is active and safeguarding your daily PayPal transactions.
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
 
-          {/* SENIOR LIMIT INCREASE MODAL */}
+                  <span className="self-start sm:self-auto text-xs font-bold px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1.5 shadow-2xs">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" /> Shield Active
+                  </span>
+                </div>
+
+                {/* Family Guardians Reassurance */}
+                <div className="bg-white/70 rounded-2xl p-4 sm:p-5 border border-black/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      Connected Family Guardians
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-800 font-medium">
+                      {seniorGuardians.length > 0
+                        ? `${seniorGuardians.map((g) => `${g.fullName} (${g.relationship})`).join(', ')} are actively linked to review unusual payments.`
+                        : 'Your family caregivers are linked to confirm unusual or large payments.'}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-900 border border-purple-200">
+                      Approval Threshold: ${seniorFamilyThreshold.toFixed(0)}
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                      Daily Limit: ${seniorDailyCap.toFixed(0)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Pending Limit Request Alert if any */}
+                {seniorPendingLimitRequests.length > 0 && (
+                  <div className="p-4 rounded-2xl bg-purple-50/90 border border-purple-200 text-purple-950 flex items-start justify-between gap-3 text-xs">
+                    <div className="flex items-start gap-2.5">
+                      <Clock className="w-4 h-4 text-purple-600 mt-0.5 shrink-0 animate-pulse" />
+                      <div>
+                        <span className="font-bold text-purple-900 block">
+                          Limit Increase Request Pending Guardian Review
+                        </span>
+                        <p className="text-purple-800 text-[11px] mt-0.5">
+                          You requested +${seniorPendingLimitRequests[0].requestedAmount.toFixed(0)} {seniorPendingLimitRequests[0].limitType.toLowerCase()} allowance
+                          {seniorPendingLimitRequests[0].reason ? ` for "${seniorPendingLimitRequests[0].reason}"` : ''}. Your family caregiver has been notified.
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-200 text-purple-900 shrink-0">
+                      Awaiting Guardian
+                    </span>
+                  </div>
+                )}
+
+                {/* Decreasing Daily and Monthly Caps Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                  {/* Daily Remaining Cap */}
+                  <div className="liquid-glass-subtle rounded-2xl p-5 border border-white space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Remaining Today</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                        Daily Cap
+                      </span>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black text-slate-950">
+                      ${seniorRemainingDailyCap.toFixed(2)}
+                    </div>
+                    <div className="w-full bg-slate-200/80 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min(100, (seniorTodaySpend / Math.max(1, seniorDailyCap)) * 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      ${seniorTodaySpend.toFixed(2)} spent of ${seniorDailyCap.toFixed(2)} daily cap
+                    </p>
+                  </div>
+
+                  {/* Monthly Remaining Budget */}
+                  <div className="liquid-glass-subtle rounded-2xl p-5 border border-white space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Remaining Month</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                        Monthly Budget
+                      </span>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black text-slate-950">
+                      ${seniorRemainingMonthlyBudget.toFixed(2)}
+                    </div>
+                    <div className="w-full bg-slate-200/80 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-blue-500 h-1.5 rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min(100, (seniorMonthSpend / Math.max(1, seniorMonthlyBudget)) * 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      ${seniorMonthSpend.toFixed(2)} spent of ${seniorMonthlyBudget.toFixed(2)} budget
+                    </p>
+                  </div>
+
+                  {/* Request Limit Increase & Checkout Action */}
+                  <div className="liquid-glass-subtle rounded-2xl p-5 border border-white flex flex-col justify-between space-y-3">
+                    <div>
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Need Higher Cap?</span>
+                      <p className="text-[11px] text-slate-600 font-medium mt-1">
+                        Request an instant spending limit increase from your linked caregivers.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => setIsSeniorLimitModalOpen(true)}
+                        className="w-full py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-purple-200" />
+                        <span>Request Limit Increase</span>
+                      </button>
+                      <Link
+                        href="/checkout"
+                        className="w-full py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 active:scale-95"
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Protected Checkout</span>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Senior Profile Data & Linked Details */}
+              <div className="liquid-glass rounded-3xl p-6 sm:p-7 border border-white/80 shadow-[0_16px_40px_-12px_rgba(15,23,42,0.08)] space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shadow-2xs">
+                      <User className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-slate-950">Senior Profile &amp; Contact Information</h2>
+                      <p className="text-xs text-slate-500">Protected family member account</p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-700">
+                    ID: {currentUser?.id?.slice(0, 8)}...
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="p-3.5 bg-white/70 rounded-2xl border border-black/5 space-y-1">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Your Full Name</span>
+                    <span className="font-extrabold text-slate-900 text-sm block">{currentUser?.fullName}</span>
+                    <span className="text-[10px] text-emerald-700 font-semibold block">Protected Senior Account</span>
+                  </div>
+                  <div className="p-3.5 bg-white/70 rounded-2xl border border-black/5 space-y-1">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Account Contact</span>
+                    <span className="font-mono text-slate-800 text-xs truncate block">{currentUser?.email}</span>
+                    <span className="text-[10px] text-slate-500 block truncate">
+                      {currentUser?.phoneNumber ? `Mobile: ${currentUser.phoneNumber}` : 'SSO Verified'}
+                    </span>
+                  </div>
+                  <div className="p-3.5 bg-white/70 rounded-2xl border border-black/5 space-y-1">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Primary Family Guardian</span>
+                    <span className="font-bold text-purple-900 text-xs block truncate">
+                      {seniorGuardians.length > 0
+                        ? `${seniorGuardians[0].fullName} (${seniorGuardians[0].relationship})`
+                        : 'Caregiver Linked'}
+                    </span>
+                    <span className="font-mono text-slate-500 text-[10px] block truncate">
+                      {seniorGuardians.length > 0 ? seniorGuardians[0].email : 'Connected Guardian'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-xs">
+                  <div className="p-2.5 bg-white/60 rounded-xl border border-black/5 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] text-slate-500 font-semibold uppercase block">Home Baseline</span>
+                      <span className="font-bold text-slate-900 text-xs flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-slate-400" />
+                        <span>{currentUser?.city ? `${currentUser.city} ${currentUser.primaryZipCode || ''}` : 'Local Region'}</span>
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold">AI Active</span>
+                  </div>
+
+                  <div className="p-2.5 bg-white/60 rounded-xl border border-black/5 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] text-slate-500 font-semibold uppercase block">Monthly Budget</span>
+                      <span className="font-bold text-slate-900 text-xs">${seniorMonthlyBudget.toLocaleString()}</span>
+                    </div>
+                    <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full font-bold">Planned</span>
+                  </div>
+
+                  <div className="p-2.5 bg-white/60 rounded-xl border border-black/5 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] text-slate-500 font-semibold uppercase block">Emergency Backup</span>
+                      <span className="font-bold text-slate-900 text-xs truncate block">
+                        {currentUser?.emergencyContactName ? `${currentUser.emergencyContactName}` : 'Family Guardian'}
+                      </span>
+                    </div>
+                    <Heart className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Active Holds Banner */}
+              {seniorHolds.length > 0 && (
+                <div className="liquid-glass rounded-3xl p-6 sm:p-7 border border-amber-200 shadow-md space-y-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center">
+                      <Clock className="w-4 h-4 animate-spin" />
+                    </div>
+                    <div>
+                      <h2 className="text-base sm:text-lg font-bold text-slate-950">We&apos;re Checking In With Your Family</h2>
+                      <p className="text-xs text-slate-500">Your payments are protected. No money has left your account.</p>
+                    </div>
+                  </div>
+
+                  {seniorHolds.map((hold) => (
+                    <div key={hold.id} className="bg-white/90 rounded-2xl p-4 sm:p-5 border border-amber-100 shadow-2xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm sm:text-base font-bold text-slate-900">{hold.merchantName}</div>
+                          <div className="text-xs text-slate-500">{hold.category}</div>
+                        </div>
+                        <div className="text-lg sm:text-xl font-extrabold text-slate-950">${hold.amount.toFixed(2)}</div>
+                      </div>
+                      <p className="text-xs text-slate-700 font-medium bg-amber-50/70 p-3 rounded-xl border border-amber-100/60 leading-relaxed">
+                        {hold.seniorMessage}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* =================================================================
+              TAB 2: LEDGER (PAYMENTS, FILTERS, PAYPAL SANDBOX SIMULATION)
+              ================================================================= */}
+          {seniorTab === 'ledger' && (
+            <div className="space-y-6">
+              {/* Top Sandbox Simulation Suite & Custom Demo Trigger */}
+              <div className="liquid-glass rounded-3xl p-6 sm:p-8 border border-white/80 shadow-[0_20px_50px_-16px_rgba(15,23,42,0.1)] space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <h2 className="text-lg sm:text-xl font-extrabold text-slate-950">
+                        PayPal Sandbox Simulation Suite
+                      </h2>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-1">
+                      Execute real-time dual-layer risk evaluation &amp; PayPal sandbox checkouts. Approved checkouts immediately decrement caps!
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setCustomSimResult(null);
+                      setIsCustomCheckoutOpen(true);
+                    }}
+                    className="py-2.5 px-4 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 active:scale-95 shrink-0"
+                  >
+                    <Sliders className="w-4 h-4 text-purple-300" />
+                    <span>Custom Demo Checkout Modal</span>
+                  </button>
+                </div>
+
+                {/* 1-Click Sandbox Test Scenarios */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+                  {/* Scenario 1: Routine Pharmacy */}
+                  <button
+                    disabled={customSimulating}
+                    onClick={() =>
+                      handleRunDemoSimulation({
+                        merchantName: 'Local Care Pharmacy',
+                        amount: 32.50,
+                        category: 'Pharmacy & Health',
+                        autoSettle: true,
+                      })
+                    }
+                    className="p-3.5 bg-white/80 hover:bg-white rounded-2xl border border-slate-200/80 text-left transition-all active:scale-[0.98] shadow-2xs space-y-1.5 group cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                        Routine Auto
+                      </span>
+                      <Play className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-900 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                    <div className="text-xs font-bold text-slate-900">Local Care Pharmacy</div>
+                    <div className="text-sm font-extrabold text-slate-950">$32.50</div>
+                    <p className="text-[10px] text-slate-500">Auto-approved routine medication refill</p>
+                  </button>
+
+                  {/* Scenario 2: Routine Online */}
+                  <button
+                    disabled={customSimulating}
+                    onClick={() =>
+                      handleRunDemoSimulation({
+                        merchantName: 'Amazon Home & Gardening',
+                        amount: 45.99,
+                        category: 'Home & Garden',
+                        autoSettle: true,
+                      })
+                    }
+                    className="p-3.5 bg-white/80 hover:bg-white rounded-2xl border border-slate-200/80 text-left transition-all active:scale-[0.98] shadow-2xs space-y-1.5 group cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                        Routine Auto
+                      </span>
+                      <Play className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-900 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                    <div className="text-xs font-bold text-slate-900">Amazon Gardening Set</div>
+                    <div className="text-sm font-extrabold text-slate-950">$45.99</div>
+                    <p className="text-[10px] text-slate-500">Under $100 family threshold</p>
+                  </button>
+
+                  {/* Scenario 3: Threshold Exceeded */}
+                  <button
+                    disabled={customSimulating}
+                    onClick={() =>
+                      handleRunDemoSimulation({
+                        merchantName: 'BestBuy Electronics Store',
+                        amount: 450.00,
+                        category: 'Electronics',
+                        autoSettle: true,
+                      })
+                    }
+                    className="p-3.5 bg-white/80 hover:bg-white rounded-2xl border border-amber-200/80 text-left transition-all active:scale-[0.98] shadow-2xs space-y-1.5 group cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                        Family Hold
+                      </span>
+                      <Play className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                    <div className="text-xs font-bold text-slate-900">BestBuy Electronics</div>
+                    <div className="text-sm font-extrabold text-amber-900">$450.00</div>
+                    <p className="text-[10px] text-slate-500">Exceeds $100 threshold &rarr; holds for Maya</p>
+                  </button>
+
+                  {/* Scenario 4: Crypto / Policy Warning */}
+                  <button
+                    disabled={customSimulating}
+                    onClick={() =>
+                      handleRunDemoSimulation({
+                        merchantName: 'Crypto Wire Global',
+                        amount: 1200.00,
+                        category: 'Wire / Crypto',
+                        autoSettle: true,
+                      })
+                    }
+                    className="p-3.5 bg-white/80 hover:bg-white rounded-2xl border border-rose-200/80 text-left transition-all active:scale-[0.98] shadow-2xs space-y-1.5 group cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full">
+                        High Risk
+                      </span>
+                      <Play className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-600 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                    <div className="text-xs font-bold text-slate-900">Crypto Wire Global</div>
+                    <div className="text-sm font-extrabold text-rose-900">$1,200.00</div>
+                    <p className="text-[10px] text-slate-500">Unusual high-risk merchant blocked</p>
+                  </button>
+                </div>
+
+                {customSimulating && (
+                  <div className="flex items-center gap-2 p-3 rounded-2xl bg-purple-50 text-purple-900 text-xs font-semibold animate-pulse border border-purple-200">
+                    <RefreshCw className="w-4 h-4 animate-spin text-purple-600" />
+                    <span>Executing Dual-Layer Risk Engine &amp; PayPal Sandbox API...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Transactions Ledger Card */}
+              <div className="liquid-glass rounded-3xl p-6 sm:p-8 border border-white/80 shadow-[0_16px_40px_-12px_rgba(15,23,42,0.08)] space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold text-slate-950">Payment History &amp; Approval States</h2>
+                    <p className="text-xs text-slate-500">Every payment made, approved, waiting, or declined</p>
+                  </div>
+
+                  {/* Filter Chips */}
+                  <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-full border border-slate-200/60 overflow-x-auto">
+                    <button
+                      onClick={() => setSeniorLedgerFilter('ALL')}
+                      className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                        seniorLedgerFilter === 'ALL'
+                          ? 'bg-slate-950 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-950'
+                      }`}
+                    >
+                      All ({seniorRecentPayments.length})
+                    </button>
+                    <button
+                      onClick={() => setSeniorLedgerFilter('APPROVED')}
+                      className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                        seniorLedgerFilter === 'APPROVED'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-950'
+                      }`}
+                    >
+                      Approved ({seniorApprovedCount})
+                    </button>
+                    <button
+                      onClick={() => setSeniorLedgerFilter('WAITING')}
+                      className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                        seniorLedgerFilter === 'WAITING'
+                          ? 'bg-amber-500 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-950'
+                      }`}
+                    >
+                      Waiting ({seniorWaitingCount})
+                    </button>
+                    <button
+                      onClick={() => setSeniorLedgerFilter('DECLINED')}
+                      className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                        seniorLedgerFilter === 'DECLINED'
+                          ? 'bg-rose-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-950'
+                      }`}
+                    >
+                      Declined ({seniorDeclinedCount})
+                    </button>
+                  </div>
+                </div>
+
+                {/* Ledger Items List */}
+                {seniorFilteredPayments.length === 0 ? (
+                  <div className="p-8 text-center space-y-2 bg-white/40 rounded-2xl border border-dashed border-slate-200">
+                    <ReceiptText className="w-8 h-8 text-slate-400 mx-auto" />
+                    <p className="text-xs font-semibold text-slate-600">No transactions match the selected filter.</p>
+                    <button
+                      onClick={() => setSeniorLedgerFilter('ALL')}
+                      className="text-xs font-bold text-purple-700 underline"
+                    >
+                      View All Transactions
+                    </button>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-black/5 bg-white/60 rounded-2xl border border-black/5 overflow-hidden">
+                    {seniorFilteredPayments.map((p) => {
+                      const isApproved = ['SETTLED', 'APPROVED_FOR_CHECKOUT', 'READY_FOR_CHECKOUT'].includes(p.status);
+                      const isWaiting = ['AWAITING_FAMILY', 'CAPTURE_PENDING', 'CHECKOUT_IN_PROGRESS'].includes(p.status);
+                      const isDeclined = ['DECLINED_BY_FAMILY', 'BLOCKED_BY_POLICY', 'EXPIRED', 'CANCELLED_BY_USER', 'CAPTURE_FAILED'].includes(p.status);
+
+                      return (
+                        <div key={p.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/80 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                                isApproved
+                                  ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                                  : isWaiting
+                                  ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                                  : 'bg-rose-50 text-rose-600 border border-rose-100'
+                              }`}
+                            >
+                              <Store className="w-5 h-5" />
+                            </div>
+
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-slate-900">{p.merchantName}</span>
+                                {p.riskScore !== undefined && p.riskScore !== null && (
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                                    Risk: {p.riskScore}/100
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-slate-500">
+                                {new Date(p.createdAt).toLocaleDateString([], {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}{' '}
+                                • {p.category}
+                              </div>
+                              {p.explanation?.seniorExplanation && (
+                                <p className="text-[11px] text-slate-600 pt-0.5 leading-snug">
+                                  {p.explanation.seniorExplanation}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="text-left sm:text-right shrink-0 flex sm:flex-col items-center sm:items-end justify-between gap-1">
+                            <div className="text-sm sm:text-base font-extrabold text-slate-950">
+                              ${p.amount.toFixed(2)}
+                            </div>
+                            <span
+                              className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
+                                isApproved
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                  : isWaiting
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                  : 'bg-rose-100 text-rose-800 border border-rose-200'
+                              }`}
+                            >
+                              {isApproved && <CheckCircle2 className="w-3 h-3" />}
+                              {isWaiting && <Clock className="w-3 h-3" />}
+                              {isDeclined && <XCircle className="w-3 h-3" />}
+                              <span>
+                                {isApproved ? 'Approved & Settled' : isWaiting ? 'Awaiting Family' : 'Declined'}
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* =================================================================
+              CUSTOM DEMO CHECKOUT MODAL (FOR PAYPAL JUDGES & TESTERS)
+              ================================================================= */}
+          {isCustomCheckoutOpen && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                      <CreditCard className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900">Custom PayPal Sandbox Checkout</h3>
+                      <p className="text-[11px] text-slate-500">Provide any merchant and amount to test live safeguards</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsCustomCheckoutOpen(false)}
+                    className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1"
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                {customSimResult ? (
+                  <div className="space-y-4">
+                    <div
+                      className={`p-5 rounded-2xl border text-center space-y-2 ${
+                        customSimResult.status === 'SETTLED'
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                          : customSimResult.status === 'AWAITING_FAMILY'
+                          ? 'bg-amber-50 border-amber-200 text-amber-950'
+                          : 'bg-rose-50 border-rose-200 text-rose-950'
+                      }`}
+                    >
+                      <div
+                        className={`w-12 h-12 rounded-full mx-auto flex items-center justify-center ${
+                          customSimResult.status === 'SETTLED'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : customSimResult.status === 'AWAITING_FAMILY'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-rose-100 text-rose-700'
+                        }`}
+                      >
+                        {customSimResult.status === 'SETTLED' ? (
+                          <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                        ) : customSimResult.status === 'AWAITING_FAMILY' ? (
+                          <Clock className="w-6 h-6 text-amber-600" />
+                        ) : (
+                          <XCircle className="w-6 h-6 text-rose-600" />
+                        )}
+                      </div>
+
+                      <div className="text-base font-extrabold">
+                        {customSimResult.status === 'SETTLED'
+                          ? 'Payment Approved & Settled!'
+                          : customSimResult.status === 'AWAITING_FAMILY'
+                          ? 'Held Awaiting Family Approval'
+                          : 'Transaction Blocked by SafePay'}
+                      </div>
+
+                      <p className="text-xs leading-relaxed max-w-sm mx-auto">
+                        {customSimResult.seniorMessage}
+                      </p>
+
+                      <div className="pt-2 flex flex-wrap justify-center gap-2 text-[11px] font-mono">
+                        {customSimResult.payPalCaptureId && (
+                          <span className="bg-white/80 px-2.5 py-1 rounded-md border border-black/10">
+                            Capture: {customSimResult.payPalCaptureId}
+                          </span>
+                        )}
+                        {customSimResult.riskScore !== undefined && (
+                          <span className="bg-white/80 px-2.5 py-1 rounded-md border border-black/10">
+                            Risk Score: {customSimResult.riskScore}/100
+                          </span>
+                        )}
+                      </div>
+
+                      {customSimResult.status === 'SETTLED' && (
+                        <p className="text-[11px] font-bold text-emerald-800 pt-1">
+                          Remaining daily and monthly spending caps have been decreased automatically.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setCustomSimResult(null);
+                        }}
+                        className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        Test Another Charge
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsCustomCheckoutOpen(false);
+                          setCustomSimResult(null);
+                        }}
+                        className="flex-1 py-2.5 px-4 rounded-xl bg-slate-950 text-white text-xs font-bold hover:bg-slate-800 transition-colors"
+                      >
+                        View in Ledger
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleRunDemoSimulation({
+                        merchantName: customMerchant,
+                        amount: Number(customAmount),
+                        category: customCategory,
+                        autoSettle: customAutoSettle,
+                      });
+                    }}
+                    className="space-y-4"
+                  >
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Merchant / Recipient Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={customMerchant}
+                        onChange={(e) => setCustomMerchant(e.target.value)}
+                        placeholder="e.g., Whole Foods, BestBuy, Pharmacy"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Amount ($ USD)</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="1"
+                            max="5000"
+                            required
+                            value={customAmount}
+                            onChange={(e) => setCustomAmount(e.target.value)}
+                            className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Category</label>
+                        <select
+                          value={customCategory}
+                          onChange={(e) => setCustomCategory(e.target.value)}
+                          className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                        >
+                          <option value="Groceries">Groceries</option>
+                          <option value="Pharmacy & Health">Pharmacy & Health</option>
+                          <option value="Electronics">Electronics</option>
+                          <option value="Home & Garden">Home & Garden</option>
+                          <option value="Online Retail">Online Retail</option>
+                          <option value="Wire / Crypto">Wire / Crypto</option>
+                          <option value="Entertainment">Entertainment</option>
+                          <option value="Travel & Transport">Travel & Transport</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Purchase Note / Cart Memo</label>
+                      <input
+                        type="text"
+                        value={customNote}
+                        onChange={(e) => setCustomNote(e.target.value)}
+                        placeholder="e.g., Weekly essentials"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div className="p-3 bg-purple-50 rounded-xl border border-purple-200/80 flex items-center justify-between text-xs">
+                      <div>
+                        <span className="font-bold text-purple-950 block">Auto-settle routine approvals</span>
+                        <span className="text-[11px] text-purple-800">Decreases senior daily cap automatically</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={customAutoSettle}
+                        onChange={(e) => setCustomAutoSettle(e.target.checked)}
+                        className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsCustomCheckoutOpen(false)}
+                        className="flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={customSimulating}
+                        className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold bg-slate-950 hover:bg-slate-800 text-white transition-all shadow-sm flex items-center justify-center gap-1.5 active:scale-95"
+                      >
+                        {customSimulating ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Evaluating...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Simulate Checkout</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* =================================================================
+              SENIOR LIMIT INCREASE MODAL
+              ================================================================= */}
           {isSeniorLimitModalOpen && (
             <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
               <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-200">
@@ -2358,7 +3131,7 @@ export default function DashboardPage() {
 
               {/* Window Body: Collapsible Elder Sidebar + Main Chat Pane */}
               <div
-                className={`flex flex-col md:flex-row h-[620px] transition-colors duration-200 ${
+                className={`flex flex-col md:flex-row h-[700px] max-h-[85vh] transition-colors duration-200 ${
                   chatDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50/50 text-slate-900'
                 }`}
               >
@@ -2502,99 +3275,139 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {/* High-Priority In-Chat Approvals & Controls Card */}
-                  {activeElder && activeElderPendingApprovals.length > 0 && (
-                    <div
-                      className={`p-3.5 border-b space-y-2.5 transition-colors ${
-                        chatDark
-                          ? 'bg-amber-950/30 border-amber-500/20 text-amber-200'
-                          : 'bg-amber-50/80 border-amber-200 text-amber-950'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between text-xs font-bold">
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="w-4 h-4 text-amber-500 animate-spin" />
-                          <span>Pending Approval Request for {activeElder.fullName}</span>
-                        </div>
-                        <span className="text-[10px] bg-amber-400/20 text-amber-500 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
-                          Caregiver Action Required
-                        </span>
-                      </div>
-
-                      {activeElderPendingApprovals.map((hold) => (
-                        <div
-                          key={hold.id}
-                          className={`p-3 rounded-2xl border transition-colors shadow-2xs space-y-2 ${
-                            chatDark
-                              ? 'bg-slate-900/90 border-white/10 text-white'
-                              : 'bg-white border-amber-200/80 text-slate-900'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <span className="font-bold text-xs">{hold.merchantName}</span>
-                              <span className={`text-[11px] block ${chatDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                                {hold.category}
-                              </span>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-sm font-extrabold">
-                                ${hold.amount.toFixed(2)} {hold.currency}
-                              </span>
-                              <span className="text-[10px] font-bold text-rose-500 block">
-                                Risk Score: {hold.riskScore}/100
-                              </span>
-                            </div>
-                          </div>
-
-                          {hold.explanation?.caregiverExplanation && (
-                            <p
-                              className={`text-[11px] p-2 rounded-xl leading-relaxed ${
-                                chatDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-50 text-slate-600'
-                              }`}
-                            >
-                              {hold.explanation.caregiverExplanation}
-                            </p>
-                          )}
-
-                          <div className="flex items-center gap-2 pt-0.5">
-                            <button
-                              onClick={() => handleDecision(hold.id, 'APPROVED')}
-                              disabled={decidingId === hold.id}
-                              className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 active:scale-[0.98]"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Approve Payment</span>
-                            </button>
-                            <button
-                              onClick={() => handleDecision(hold.id, 'DECLINED')}
-                              disabled={decidingId === hold.id}
-                              className="flex-1 py-1.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 active:scale-[0.98]"
-                            >
-                              <XCircle className="w-3.5 h-3.5" />
-                              <span>Decline Payment</span>
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleSendChatMessage(`Why was the $${hold.amount.toFixed(0)} charge from ${hold.merchantName} held?`)
-                              }
-                              className={`py-1.5 px-3 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1 active:scale-[0.98] ${
-                                chatDark
-                                  ? 'bg-purple-900/30 text-purple-300 border-purple-500/30 hover:bg-purple-900/50'
-                                  : 'bg-purple-50 text-purple-900 border-purple-200 hover:bg-purple-100'
-                              }`}
-                            >
-                              <Sparkles className="w-3.5 h-3.5 text-purple-500" />
-                              <span>Ask AI</span>
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Chat Message Stream */}
+                  {/* Scrollable Chat Area: Both Approvals and Messages scroll seamlessly together */}
                   <div className="flex-1 p-4 sm:p-5 overflow-y-auto space-y-4">
+                    {/* High-Priority In-Chat Approvals & Controls Card (Identical to Homepage below Hero) */}
+                    {activeElder && activeElderPendingApprovals.length > 0 && (
+                      <div className="w-full flex flex-col items-center justify-center gap-3 pb-4 border-b border-black/5">
+                        <div className="w-full max-w-md flex items-center justify-between text-xs font-bold px-1">
+                          <div className="flex items-center gap-1.5 text-amber-500">
+                            <Clock className="w-4 h-4 animate-spin" />
+                            <span>Action Required ({activeElder.fullName})</span>
+                          </div>
+                          <span className="text-[10px] bg-amber-400/20 text-amber-500 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+                            Caregiver Review
+                          </span>
+                        </div>
+
+                        {activeElderPendingApprovals.map((hold) => (
+                          <div
+                            key={hold.id}
+                            className={`w-full max-w-md rounded-2xl p-6 sm:p-8 flex flex-col items-center justify-center text-center gap-3.5 border shadow-sm transition-colors ${
+                              chatDark
+                                ? 'bg-slate-900/90 border-white/10 text-white shadow-2xl'
+                                : 'liquid-glass border-white/90 text-slate-900 shadow-sm'
+                            }`}
+                          >
+                            <div
+                              className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                                chatDark ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-50 text-emerald-600'
+                              }`}
+                            >
+                              <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+                            </div>
+
+                            <div>
+                              <p
+                                className={`text-xs font-semibold uppercase tracking-wider ${
+                                  chatDark ? 'text-slate-400' : 'text-slate-400'
+                                }`}
+                              >
+                                Verified Secure Connection
+                              </p>
+                              <h3
+                                className={`text-3xl font-extrabold mt-1 ${
+                                  chatDark ? 'text-white' : 'text-slate-950'
+                                }`}
+                              >
+                                ${hold.amount.toFixed(2)}
+                              </h3>
+                              <p className="text-xs font-semibold text-slate-500 mt-1">
+                                {hold.merchantName} • {hold.category}
+                              </p>
+                              <div className="flex items-center justify-center gap-2 mt-1.5">
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                                  Risk Score: {hold.riskScore}/100
+                                </span>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 border border-purple-500/20">
+                                  Account: {activeElder.fullName}
+                                </span>
+                              </div>
+                            </div>
+
+                            {hold.explanation?.caregiverExplanation && (
+                              <p
+                                className={`text-xs p-3 rounded-xl leading-relaxed text-center max-w-sm ${
+                                  chatDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-50 text-slate-600'
+                                }`}
+                              >
+                                {hold.explanation.caregiverExplanation}
+                              </p>
+                            )}
+
+                            <div className="w-full max-w-xs flex flex-col gap-2 pt-1">
+                              <button
+                                onClick={() => handleDecision(hold.id, 'APPROVED')}
+                                disabled={decidingId === hold.id}
+                                className={`w-full py-3 rounded-full font-semibold text-sm shadow-sm active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${
+                                  chatDark
+                                    ? 'bg-white text-slate-950 hover:bg-slate-100'
+                                    : 'bg-slate-950 text-white hover:bg-slate-800'
+                                }`}
+                              >
+                                {decidingId === hold.id ? (
+                                  <>
+                                    <RefreshCw className="w-4 h-4 animate-spin text-current" />
+                                    <span>Authorizing with PayPal...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                    <span>Approve Payment</span>
+                                  </>
+                                )}
+                              </button>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleDecision(hold.id, 'DECLINED')}
+                                  disabled={decidingId === hold.id}
+                                  className={`flex-1 py-2 rounded-full font-semibold text-xs border transition-all active:scale-[0.98] ${
+                                    chatDark
+                                      ? 'border-rose-500/30 text-rose-300 hover:bg-rose-950/30'
+                                      : 'border-rose-200 text-rose-700 hover:bg-rose-50'
+                                  }`}
+                                >
+                                  Decline
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleSendChatMessage(
+                                      `Why was the $${hold.amount.toFixed(0)} charge from ${hold.merchantName} held?`
+                                    )
+                                  }
+                                  className={`flex-1 py-2 rounded-full font-semibold text-xs border transition-all active:scale-[0.98] ${
+                                    chatDark
+                                      ? 'border-purple-500/30 text-purple-300 hover:bg-purple-900/40'
+                                      : 'border-purple-200 text-purple-700 hover:bg-purple-50'
+                                  }`}
+                                >
+                                  Ask AI
+                                </button>
+                              </div>
+                            </div>
+
+                            <p
+                              className={`text-[10px] uppercase tracking-widest font-bold ${
+                                chatDark ? 'text-slate-500' : 'text-slate-400'
+                              }`}
+                            >
+                              Secured by Family Member Oversight
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {activeElder &&
                       (chatMessagesByElder[activeElder.id] || []).map((msg) => (
                         <div

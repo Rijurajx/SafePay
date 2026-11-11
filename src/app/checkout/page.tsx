@@ -227,7 +227,7 @@ function CheckoutContent() {
       await new Promise((resolve) => setTimeout(resolve, 600));
 
       // If approved, create the real PayPal Sandbox Order!
-      if (evalData.status === 'APPROVED') {
+      if (evalData.status === 'APPROVED' || evalData.status === 'SETTLED' || evalData.status === 'READY_FOR_CHECKOUT' || !evalData.requiresFamilyApproval) {
         setEvalStep('Generating secure PayPal Sandbox Order...');
         const paypalRes = await fetch('/api/checkout/create-order', {
           method: 'POST',
@@ -439,7 +439,7 @@ function CheckoutContent() {
           {/* EVALUATION RESULTS BANNER */}
           {evalResult && (
             <div className="space-y-6 pt-2 animate-fade-in">
-              {evalResult.status === 'APPROVED' ? (
+              {['APPROVED', 'SETTLED', 'READY_FOR_CHECKOUT'].includes(evalResult.status) ? (
                 /* APPROVED RESULT */
                 <div className="liquid-glass rounded-2xl p-6 border border-emerald-300 shadow-md space-y-4">
                   <div className="flex items-center justify-between">

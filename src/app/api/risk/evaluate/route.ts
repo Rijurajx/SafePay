@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { prisma } from '@/lib/db';
 import { getSessionUser, authorizeElderDataScope } from '@/lib/auth';
 import { evaluateTransactionRisk } from '@/lib/risk/engine';
 import { generateGeminiRiskExplanation } from '@/lib/ai/gemini-explainer';
 import { Decimal } from '@prisma/client/runtime/library';
-import { AuditActorType, PaymentRequestStatus, ReservationStatus } from '@prisma/client';
+import { AuditActorType, PaymentRequestStatus, ReservationStatus, PayPalOrderStatus } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
       merchantCode: inputMerchantCode,
       category: inputCategory = 'General Merchandise',
       transactionTime: inputTransactionTime,
+      autoSettle = false,
     } = body;
 
     // Resolve target elder intelligently
@@ -140,8 +142,11 @@ export async function POST(req: NextRequest) {
     const todaySettled = await prisma.paymentRequest.aggregate({
       where: {
         elderId,
-        status: PaymentRequestStatus.SETTLED,
-        settledAt: { gte: startOfDay },
+        status: { in: [PaymentRequestStatus.SETTLED, PaymentRequestStatus.APPROVED_FOR_CHECKOUT] },
+        OR: [
+          { settledAt: { gte: startOfDay } },
+          { AND: [{ settledAt: null }, { createdAt: { gte: startOfDay } }] },
+        ],
       },
       _sum: { amount: true },
     });
@@ -167,8 +172,11 @@ export async function POST(req: NextRequest) {
     const monthSettled = await prisma.paymentRequest.aggregate({
       where: {
         elderId,
-        status: PaymentRequestStatus.SETTLED,
-        settledAt: { gte: startOfMonth },
+        status: { in: [PaymentRequestStatus.SETTLED, PaymentRequestStatus.APPROVED_FOR_CHECKOUT] },
+        OR: [
+          { settledAt: { gte: startOfMonth } },
+          { AND: [{ settledAt: null }, { createdAt: { gte: startOfMonth } }] },
+        ],
       },
       _sum: { amount: true },
     });
@@ -328,19 +336,62 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    let finalStatus = deterministicResult.status;
+    let isSettled = false;
+    let payPalCaptureId: string | null = null;
+
+    if (
+      autoSettle &&
+      !deterministicResult.requiresFamilyApproval &&
+      deterministicResult.status !== PaymentRequestStatus.BLOCKED_BY_POLICY
+    ) {
+      finalStatus = PaymentRequestStatus.SETTLED;
+      isSettled = true;
+      const settledAt = new Date();
+
+      await prisma.paymentRequest.update({
+        where: { id: targetPaymentRequest.id },
+        data: {
+          status: PaymentRequestStatus.SETTLED,
+          settledAt,
+        },
+      });
+
+      payPalCaptureId = `SANDBOX-CAP-${Date.now().toString(36).toUpperCase()}`;
+      await prisma.payPalOrder.create({
+        data: {
+          paymentRequestId: targetPaymentRequest.id,
+          paypalOrderId: `SANDBOX-ORD-${Date.now().toString(36).toUpperCase()}`,
+          status: PayPalOrderStatus.COMPLETED,
+          amount: new Decimal(amount),
+          currency: 'USD',
+          paypalCaptureId: payPalCaptureId,
+          createRequestId: crypto.randomUUID(),
+          captureRequestId: crypto.randomUUID(),
+          rawResponse: {
+            id: payPalCaptureId,
+            status: 'COMPLETED',
+            sandbox: true,
+          },
+        },
+      });
+    }
+
     // Record audit event
     await prisma.auditEvent.create({
       data: {
         paymentRequestId: targetPaymentRequest.id,
         actorId: session.id,
         actorType: session.isSynthetic ? AuditActorType.USER : AuditActorType.SYSTEM,
-        eventType: 'RISK_EVALUATION_COMPLETED',
-        newState: deterministicResult.status,
+        eventType: isSettled ? 'PAYPAL_CAPTURE_COMPLETED' : 'RISK_EVALUATION_COMPLETED',
+        newState: finalStatus,
         metadata: {
           riskScore: deterministicResult.riskScore,
           classification: deterministicResult.classification,
           signalsCount: deterministicResult.signals.length,
           modelUsed: explanation.modelUsed,
+          isSettled,
+          payPalCaptureId,
         },
       },
     });
@@ -353,7 +404,10 @@ export async function POST(req: NextRequest) {
       requiresFamilyApproval: deterministicResult.requiresFamilyApproval,
       signals: deterministicResult.signals,
       explanation,
-      status: deterministicResult.status,
+      status: isSettled ? 'SETTLED' : !deterministicResult.requiresFamilyApproval ? 'APPROVED' : finalStatus,
+      rawStatus: finalStatus,
+      isSettled,
+      payPalCaptureId,
       blockingReason: deterministicResult.blockingReason,
     });
   } catch (error: unknown) {

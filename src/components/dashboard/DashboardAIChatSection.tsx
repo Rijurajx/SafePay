@@ -7,7 +7,7 @@ import {
   Copy,
   Check,
   RefreshCw,
-  ShieldAlert,
+  CheckCircle2,
 } from 'lucide-react';
 import { SessionUser } from '@/types';
 
@@ -217,7 +217,39 @@ export function DashboardAIChatSection({
       </div>
 
       {/* Main Chat Messages Container */}
-      <div className="h-[360px] sm:h-[400px] overflow-y-auto p-5 sm:p-6 space-y-4 bg-white/40">
+      <div className="h-[380px] sm:h-[440px] overflow-y-auto p-5 sm:p-6 space-y-4 bg-white/40">
+        {/* Verified Secure Connection Approval Card (Preview Mode below Hero style) */}
+        {latestHold && (
+          <div className="mb-4 mx-auto max-w-sm rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center gap-2.5 border border-white/90 liquid-glass shadow-xs">
+            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center">
+              <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Verified Secure Connection
+              </p>
+              <h3 className="text-2xl font-extrabold mt-0.5 text-slate-950">
+                ${latestHold.amount.toFixed(2)}
+              </h3>
+              <p className="text-xs font-semibold text-slate-600 mt-0.5">
+                {latestHold.merchantName} • {latestHold.category}
+              </p>
+              <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                Risk Score: {latestHold.riskScore}/100
+              </span>
+            </div>
+            <button
+              onClick={() => handleSend(`Why was the $${latestHold.amount.toFixed(0)} charge from ${latestHold.merchantName} held?`)}
+              className="w-full max-w-xs py-2 rounded-full font-semibold text-xs bg-slate-950 text-white hover:bg-slate-800 transition-all shadow-xs"
+            >
+              Analyze in Chat &rarr;
+            </button>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-slate-400">
+              Secured by Family Member Oversight
+            </p>
+          </div>
+        )}
+
         {messages.map((m) => (
           <div
             key={m.id}
@@ -302,24 +334,6 @@ export function DashboardAIChatSection({
 
       {/* Interactive Bottom Context Bar (Identical to Homepage below Hero) */}
       <div className="p-3.5 sm:p-4 border-t border-black/5 bg-white/70 backdrop-blur-md">
-        {/* Real-time hold alert banner if hold is pending */}
-        {latestHold && (
-          <div className="mb-2.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200/70 flex items-center justify-between text-xs text-amber-900">
-            <div className="flex items-center gap-1.5 truncate">
-              <ShieldAlert className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-              <span className="font-semibold truncate">
-                Hold Pending: {latestHold.merchantName} (${latestHold.amount.toFixed(2)})
-              </span>
-            </div>
-            <button
-              onClick={() => handleSend(`Why was the $${latestHold.amount.toFixed(0)} charge from ${latestHold.merchantName} held?`)}
-              className="text-[10px] font-bold text-amber-800 underline hover:text-amber-950 shrink-0 ml-2"
-            >
-              Analyze in Chat &rarr;
-            </button>
-          </div>
-        )}
-
         <form
           onSubmit={(e) => {
             e.preventDefault();

@@ -186,7 +186,7 @@ export default function HomePage() {
         {/* Action Buttons with Apple Liquid Glass feel */}
         <div className="flex flex-wrap items-center justify-center gap-3.5 pt-2">
           <Link
-            href="/auth/signup"
+            href="/signup"
             className="px-6 py-3 rounded-full bg-slate-950 text-white font-medium text-sm hover:bg-slate-800 active:scale-[0.98] transition-all shadow-md shadow-slate-950/10 flex items-center gap-2"
           >
             <span>Get Started</span>

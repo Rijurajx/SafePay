@@ -68,8 +68,11 @@ export async function GET(req: NextRequest) {
         const sumToday = await prisma.paymentRequest.aggregate({
           where: {
             elderId: eId,
-            status: PaymentRequestStatus.SETTLED,
-            settledAt: { gte: startOfDay },
+            status: { in: [PaymentRequestStatus.SETTLED, PaymentRequestStatus.APPROVED_FOR_CHECKOUT] },
+            OR: [
+              { settledAt: { gte: startOfDay } },
+              { AND: [{ settledAt: null }, { createdAt: { gte: startOfDay } }] },
+            ],
           },
           _sum: { amount: true },
         });
@@ -78,8 +81,11 @@ export async function GET(req: NextRequest) {
         const sumMonth = await prisma.paymentRequest.aggregate({
           where: {
             elderId: eId,
-            status: PaymentRequestStatus.SETTLED,
-            settledAt: { gte: startOfMonth },
+            status: { in: [PaymentRequestStatus.SETTLED, PaymentRequestStatus.APPROVED_FOR_CHECKOUT] },
+            OR: [
+              { settledAt: { gte: startOfMonth } },
+              { AND: [{ settledAt: null }, { createdAt: { gte: startOfMonth } }] },
+            ],
           },
           _sum: { amount: true },
         });
@@ -227,8 +233,11 @@ export async function GET(req: NextRequest) {
       const todaySum = await prisma.paymentRequest.aggregate({
         where: {
           elderId: session.id,
-          status: PaymentRequestStatus.SETTLED,
-          settledAt: { gte: startOfDay },
+          status: { in: [PaymentRequestStatus.SETTLED, PaymentRequestStatus.APPROVED_FOR_CHECKOUT] },
+          OR: [
+            { settledAt: { gte: startOfDay } },
+            { AND: [{ settledAt: null }, { createdAt: { gte: startOfDay } }] },
+          ],
         },
         _sum: { amount: true },
       });
@@ -236,8 +245,11 @@ export async function GET(req: NextRequest) {
       const monthSum = await prisma.paymentRequest.aggregate({
         where: {
           elderId: session.id,
-          status: PaymentRequestStatus.SETTLED,
-          settledAt: { gte: startOfMonth },
+          status: { in: [PaymentRequestStatus.SETTLED, PaymentRequestStatus.APPROVED_FOR_CHECKOUT] },
+          OR: [
+            { settledAt: { gte: startOfMonth } },
+            { AND: [{ settledAt: null }, { createdAt: { gte: startOfMonth } }] },
+          ],
         },
         _sum: { amount: true },
       });
@@ -256,9 +268,12 @@ export async function GET(req: NextRequest) {
 
       const recentPayments = await prisma.paymentRequest.findMany({
         where: { elderId: session.id },
-        include: { recipient: true },
+        include: {
+          recipient: true,
+          currentRiskAssessment: true,
+        },
         orderBy: { createdAt: 'desc' },
-        take: 8,
+        take: 50,
       });
 
       // Fetch pending limit increase requests for this senior
@@ -335,6 +350,13 @@ export async function GET(req: NextRequest) {
           merchantName: p.recipient.merchantName,
           category: p.recipient.category,
           createdAt: p.createdAt.toISOString(),
+          riskScore: p.currentRiskAssessment?.riskScore || null,
+          explanation: (p.currentRiskAssessment?.explanationContext as {
+            summary?: string;
+            seniorExplanation?: string;
+            seniorMessage?: string;
+            caregiverExplanation?: string;
+          } | null) || null,
         })),
       }, {
         headers: {

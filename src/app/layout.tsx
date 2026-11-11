@@ -12,8 +12,28 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className="antialiased min-h-screen flex flex-col font-sans">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(regs) {
+                  for (var i = 0; i < regs.length; i++) {
+                    regs[i].unregister();
+                  }
+                });
+                if ('caches' in window) {
+                  caches.keys().then(function(names) {
+                    for (var i = 0; i < names.length; i++) {
+                      caches.delete(names[i]);
+                    }
+                  });
+                }
+              }
+            `,
+          }}
+        />
         {children}
       </body>
     </html>
