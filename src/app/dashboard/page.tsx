@@ -40,11 +40,15 @@ import {
   CreditCard,
   Lock,
   Mail,
+  Table,
+  LayoutList,
 } from 'lucide-react';
 import { SessionUser, DemoPersonaKey } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 import { LunaMascot } from '@/components/mascot/LunaMascot';
 import { SafePayLogo } from '@/components/brand/SafePayLogo';
+import { SafePayLedgerGrid, SafePayGridRow } from '@/components/ledger/SafePayLedgerGrid';
+import { SafePayApprovalsGrid, SafePayApprovalRow } from '@/components/ledger/SafePayApprovalsGrid';
 
 interface LinkedElder {
   id: string;
@@ -298,6 +302,9 @@ export default function DashboardPage() {
   const [ledgerFilter, setLedgerFilter] = useState<'ALL' | 'SETTLED' | 'AWAITING_FAMILY' | 'DECLINED'>('ALL');
   const [ledgerSearch, setLedgerSearch] = useState('');
   const [expandedLedgerId, setExpandedLedgerId] = useState<string | null>(null);
+  const [caregiverLedgerViewMode, setCaregiverLedgerViewMode] = useState<'grid' | 'cards'>('grid');
+  const [caregiverApprovalsViewMode, setCaregiverApprovalsViewMode] = useState<'grid' | 'cards'>('grid');
+  const [seniorLedgerViewMode, setSeniorLedgerViewMode] = useState<'grid' | 'cards'>('grid');
 
   // Dedicated AI Chat State (keyed by elderId)
   const [chatMessagesByElder, setChatMessagesByElder] = useState<Record<string, ChatMessage[]>>({});
@@ -1081,6 +1088,53 @@ export default function DashboardPage() {
     });
   }, [ledgerItems, ledgerFilter, ledgerSearch]);
 
+  // Transformed row data for AG Grid engines
+  const caregiverGridRows = useMemo<SafePayGridRow[]>(() => {
+    return ledgerItems.map((item) => ({
+      id: item.id,
+      merchantName: item.merchantName,
+      category: item.category,
+      amount: item.amount,
+      currency: item.currency,
+      status: item.status,
+      riskScore: item.riskAssessment?.score,
+      createdAt: item.createdAt,
+      isTrusted: item.isTrusted,
+    }));
+  }, [ledgerItems]);
+
+  const seniorGridRows = useMemo<SafePayGridRow[]>(() => {
+    return seniorRecentPayments.map((p) => ({
+      id: p.id,
+      merchantName: p.merchantName,
+      category: p.category,
+      amount: p.amount,
+      currency: p.currency,
+      status: p.status,
+      riskScore: p.riskScore,
+      createdAt: p.createdAt,
+      isTrusted: true,
+    }));
+  }, [seniorRecentPayments]);
+
+  const caregiverApprovalsGridRows = useMemo<SafePayApprovalRow[]>(() => {
+    return pendingApprovals.map((req) => ({
+      id: req.id,
+      paymentRequestId: req.paymentRequestId,
+      elderName: req.elderName,
+      merchantName: req.merchantName,
+      amount: req.amount,
+      currency: req.currency,
+      category: req.category,
+      status: 'AWAITING_FAMILY',
+      createdAt: req.expiresAt,
+      expiresAt: req.expiresAt,
+      timeoutMinutes: 30,
+      riskScore: req.riskScore,
+      explanation: req.explanation,
+    }));
+  }, [pendingApprovals]);
+
   // Elder pending approvals for the active elder in AI chat
   const activeElderPendingApprovals = useMemo(() => {
     if (!activeElder) return [];
@@ -1709,50 +1763,88 @@ export default function DashboardPage() {
                     <p className="text-xs text-slate-500">Every payment made, approved, waiting, or declined</p>
                   </div>
 
-                  {/* Filter Chips */}
-                  <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-full border border-slate-200/60 overflow-x-auto">
-                    <button
-                      onClick={() => setSeniorLedgerFilter('ALL')}
-                      className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                        seniorLedgerFilter === 'ALL'
-                          ? 'bg-slate-950 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-950'
-                      }`}
-                    >
-                      All ({seniorRecentPayments.length})
-                    </button>
-                    <button
-                      onClick={() => setSeniorLedgerFilter('APPROVED')}
-                      className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                        seniorLedgerFilter === 'APPROVED'
-                          ? 'bg-emerald-600 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-950'
-                      }`}
-                    >
-                      Approved ({seniorApprovedCount})
-                    </button>
-                    <button
-                      onClick={() => setSeniorLedgerFilter('WAITING')}
-                      className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                        seniorLedgerFilter === 'WAITING'
-                          ? 'bg-amber-500 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-950'
-                      }`}
-                    >
-                      Waiting ({seniorWaitingCount})
-                    </button>
-                    <button
-                      onClick={() => setSeniorLedgerFilter('DECLINED')}
-                      className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                        seniorLedgerFilter === 'DECLINED'
-                          ? 'bg-rose-600 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-950'
-                      }`}
-                    >
-                      Declined ({seniorDeclinedCount})
-                    </button>
+                  <div className="flex items-center gap-2">
+                    {/* AG Grid vs Cards View Switcher */}
+                    <div className="flex items-center p-0.5 bg-slate-100 rounded-xl border border-slate-200 text-xs">
+                      <button
+                        onClick={() => setSeniorLedgerViewMode('grid')}
+                        className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-semibold transition-all cursor-pointer ${
+                          seniorLedgerViewMode === 'grid'
+                            ? 'bg-white text-purple-900 shadow-2xs border border-purple-200/50'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                        title="High-performance AG Grid view"
+                      >
+                        <Table className="w-3.5 h-3.5 text-purple-600" />
+                        <span>AG Grid</span>
+                      </button>
+                      <button
+                        onClick={() => setSeniorLedgerViewMode('cards')}
+                        className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-semibold transition-all cursor-pointer ${
+                          seniorLedgerViewMode === 'cards'
+                            ? 'bg-white text-purple-900 shadow-2xs border border-purple-200/50'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                        title="Cards list view"
+                      >
+                        <LayoutList className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Cards</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
+
+                {seniorLedgerViewMode === 'grid' ? (
+                  <SafePayLedgerGrid
+                    rowData={seniorGridRows}
+                    title="Senior Transaction History"
+                    subtitle="Filter by category, search PayPal IDs, sort columns, or export CSV"
+                  />
+                ) : (
+                  <div className="space-y-4">
+                    {/* Filter Chips */}
+                    <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-full border border-slate-200/60 overflow-x-auto">
+                      <button
+                        onClick={() => setSeniorLedgerFilter('ALL')}
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                          seniorLedgerFilter === 'ALL'
+                            ? 'bg-slate-950 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-950'
+                        }`}
+                      >
+                        All ({seniorRecentPayments.length})
+                      </button>
+                      <button
+                        onClick={() => setSeniorLedgerFilter('APPROVED')}
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                          seniorLedgerFilter === 'APPROVED'
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-950'
+                        }`}
+                      >
+                        Approved ({seniorApprovedCount})
+                      </button>
+                      <button
+                        onClick={() => setSeniorLedgerFilter('WAITING')}
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                          seniorLedgerFilter === 'WAITING'
+                            ? 'bg-amber-500 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-950'
+                        }`}
+                      >
+                        Waiting ({seniorWaitingCount})
+                      </button>
+                      <button
+                        onClick={() => setSeniorLedgerFilter('DECLINED')}
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                          seniorLedgerFilter === 'DECLINED'
+                            ? 'bg-rose-600 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-950'
+                        }`}
+                      >
+                        Declined ({seniorDeclinedCount})
+                      </button>
+                    </div>
 
                 {/* Ledger Items List */}
                 {seniorFilteredPayments.length === 0 ? (
@@ -1838,6 +1930,8 @@ export default function DashboardPage() {
                         </div>
                       );
                     })}
+                  </div>
+                )}
                   </div>
                 )}
               </div>
@@ -2711,9 +2805,9 @@ export default function DashboardPage() {
             {/* Pending Approvals Review Section */}
             {pendingApprovals.length > 0 && (
               <div className="liquid-glass rounded-3xl p-6 border border-amber-200 shadow-sm space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
                       <Clock className="w-4 h-4" />
                     </div>
                     <div>
@@ -2723,70 +2817,108 @@ export default function DashboardPage() {
                       <p className="text-xs text-slate-500">Action is required before PayPal funds can be captured</p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setActiveTab('ai-chat')}
-                    className="text-xs font-semibold text-purple-700 hover:text-purple-900 flex items-center gap-1"
-                  >
-                    <span>Analyze with AI</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {pendingApprovals.map((req) => (
-                    <div
-                      key={req.id}
-                      className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-3.5"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="text-xs font-semibold text-purple-700">{req.elderName}</div>
-                          <div className="text-base font-bold text-slate-950">{req.merchantName}</div>
-                          <div className="text-xs text-slate-500">{req.category}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-xl font-extrabold text-slate-950">
-                            ${req.amount.toFixed(2)} {req.currency}
-                          </div>
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              req.riskScore >= 70
-                                ? 'bg-rose-100 text-rose-800'
-                                : 'bg-amber-100 text-amber-800'
-                            }`}
-                          >
-                            Risk Score: {req.riskScore}/100
-                          </span>
-                        </div>
-                      </div>
-
-                      {req.explanation?.caregiverExplanation && (
-                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 text-xs text-slate-700 leading-relaxed">
-                          <strong>AI Assessment:</strong> {req.explanation.caregiverExplanation}
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          onClick={() => handleDecision(req.id, 'APPROVED')}
-                          disabled={decidingId === req.id}
-                          className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>Approve Payment</span>
-                        </button>
-                        <button
-                          onClick={() => handleDecision(req.id, 'DECLINED')}
-                          disabled={decidingId === req.id}
-                          className="flex-1 py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
-                        >
-                          <XCircle className="w-4 h-4" />
-                          <span>Decline Payment</span>
-                        </button>
-                      </div>
+                  <div className="flex items-center gap-2">
+                    {/* View Switcher */}
+                    <div className="flex items-center p-0.5 bg-slate-100 rounded-xl border border-slate-200 text-xs">
+                      <button
+                        onClick={() => setCaregiverApprovalsViewMode('grid')}
+                        className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-semibold transition-all cursor-pointer ${
+                          caregiverApprovalsViewMode === 'grid'
+                            ? 'bg-white text-purple-900 shadow-2xs border border-purple-200/50'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                        title="Interactive AG Grid view"
+                      >
+                        <Table className="w-3.5 h-3.5 text-purple-600" />
+                        <span>AG Grid</span>
+                      </button>
+                      <button
+                        onClick={() => setCaregiverApprovalsViewMode('cards')}
+                        className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-semibold transition-all cursor-pointer ${
+                          caregiverApprovalsViewMode === 'cards'
+                            ? 'bg-white text-purple-900 shadow-2xs border border-purple-200/50'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                        title="Cards view"
+                      >
+                        <LayoutList className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Cards</span>
+                      </button>
                     </div>
-                  ))}
+                    <button
+                      onClick={() => setActiveTab('ai-chat')}
+                      className="text-xs font-semibold text-purple-700 hover:text-purple-900 flex items-center gap-1"
+                    >
+                      <span>Analyze with AI</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
+
+                {caregiverApprovalsViewMode === 'grid' ? (
+                  <SafePayApprovalsGrid
+                    rowData={caregiverApprovalsGridRows}
+                    onDecide={(id, decision) => handleDecision(id, decision === 'APPROVE' ? 'APPROVED' : 'DECLINED')}
+                    decidingId={decidingId}
+                    onAnalyzeAi={() => setActiveTab('ai-chat')}
+                  />
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {pendingApprovals.map((req) => (
+                      <div
+                        key={req.id}
+                        className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-3.5"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="text-xs font-semibold text-purple-700">{req.elderName}</div>
+                            <div className="text-base font-bold text-slate-950">{req.merchantName}</div>
+                            <div className="text-xs text-slate-500">{req.category}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xl font-extrabold text-slate-950">
+                              ${req.amount.toFixed(2)} {req.currency}
+                            </div>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                req.riskScore >= 70
+                                  ? 'bg-rose-100 text-rose-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              Risk Score: {req.riskScore}/100
+                            </span>
+                          </div>
+                        </div>
+
+                        {req.explanation?.caregiverExplanation && (
+                          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 text-xs text-slate-700 leading-relaxed">
+                            <strong>AI Assessment:</strong> {req.explanation.caregiverExplanation}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            onClick={() => handleDecision(req.id, 'APPROVED')}
+                            disabled={decidingId === req.id}
+                            className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>Approve Payment</span>
+                          </button>
+                          <button
+                            onClick={() => handleDecision(req.id, 'DECLINED')}
+                            disabled={decidingId === req.id}
+                            className="flex-1 py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
+                          >
+                            <XCircle className="w-4 h-4" />
+                            <span>Decline Payment</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -2989,21 +3121,62 @@ export default function DashboardPage() {
                 <div>
                   <h3 className="text-base font-bold text-slate-950">Past Transactions &amp; Audit Ledger</h3>
                   <p className="text-xs text-slate-500">
-                    Detailed record of approved, held, and settled payments in expandable dropdown format
+                    Detailed record of approved, held, and settled payments with high-performance AG Grid
                   </p>
                 </div>
 
-                <div className="relative w-full sm:w-64">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={ledgerSearch}
-                    onChange={(e) => setLedgerSearch(e.target.value)}
-                    placeholder="Filter merchant or category..."
-                    className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-purple-600/20"
-                  />
+                <div className="flex items-center gap-2">
+                  {/* View Switcher: AG Grid vs Cards */}
+                  <div className="flex items-center p-0.5 bg-slate-100/80 rounded-xl border border-slate-200 text-xs">
+                    <button
+                      onClick={() => setCaregiverLedgerViewMode('grid')}
+                      className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-semibold transition-all cursor-pointer ${
+                        caregiverLedgerViewMode === 'grid'
+                          ? 'bg-white text-purple-900 shadow-2xs border border-purple-200/50'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                      title="Interactive AG Grid view"
+                    >
+                      <Table className="w-3.5 h-3.5 text-purple-600" />
+                      <span>AG Grid</span>
+                    </button>
+                    <button
+                      onClick={() => setCaregiverLedgerViewMode('cards')}
+                      className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-semibold transition-all cursor-pointer ${
+                        caregiverLedgerViewMode === 'cards'
+                          ? 'bg-white text-purple-900 shadow-2xs border border-purple-200/50'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                      title="Cards dropdown view"
+                    >
+                      <LayoutList className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Cards</span>
+                    </button>
+                  </div>
                 </div>
               </div>
+
+              {caregiverLedgerViewMode === 'grid' ? (
+                <SafePayLedgerGrid
+                  rowData={caregiverGridRows}
+                  loading={ledgerLoading}
+                  title="Senior Transaction Audit"
+                  subtitle="Filter by category, search PayPal IDs, sort columns, or export CSV"
+                />
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="relative w-full sm:w-64">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={ledgerSearch}
+                        onChange={(e) => setLedgerSearch(e.target.value)}
+                        placeholder="Filter merchant or category..."
+                        className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-purple-600/20"
+                      />
+                    </div>
+                  </div>
 
               {/* Status Filter Tabs */}
               <div className="flex items-center gap-1.5 p-1 bg-white/70 rounded-xl border border-slate-200/60 w-fit text-xs">
@@ -3194,6 +3367,8 @@ export default function DashboardPage() {
                       </div>
                     );
                   })}
+                </div>
+              )}
                 </div>
               )}
             </div>
