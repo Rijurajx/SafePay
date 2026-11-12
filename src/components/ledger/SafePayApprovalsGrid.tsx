@@ -98,13 +98,13 @@ export function SafePayApprovalsGrid({
     const data = params.data;
     if (!data) return null;
     return (
-      <div className="flex items-center gap-2 py-1">
+      <div className="flex items-center gap-2 h-full w-full overflow-hidden">
         <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-bold shrink-0">
           <User className="w-3.5 h-3.5" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1 overflow-hidden leading-tight">
           <span className="font-bold text-slate-900 text-xs block truncate">{data.elderName}</span>
-          <span className="text-[10px] text-slate-400 block truncate">Protected Senior</span>
+          <span className="text-[10px] text-slate-400 block truncate mt-0.5">Protected Senior</span>
         </div>
       </div>
     );
@@ -115,13 +115,13 @@ export function SafePayApprovalsGrid({
     const data = params.data;
     if (!data) return null;
     return (
-      <div className="flex items-center gap-2 py-1">
+      <div className="flex items-center gap-2 h-full w-full overflow-hidden">
         <div className="w-6 h-6 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
           <Store className="w-3.5 h-3.5" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1 overflow-hidden leading-tight">
           <span className="font-bold text-slate-900 text-xs block truncate">{data.merchantName}</span>
-          <span className="text-[10px] text-slate-400 block truncate">{data.category}</span>
+          <span className="text-[10px] text-slate-400 block truncate mt-0.5">{data.category}</span>
         </div>
       </div>
     );
@@ -131,9 +131,11 @@ export function SafePayApprovalsGrid({
   const AmountCellRenderer = (params: ICellRendererParams<SafePayApprovalRow>) => {
     const amt = Number(params.value || 0);
     return (
-      <span className="font-extrabold text-amber-950 font-mono text-sm">
-        ${amt.toFixed(2)}
-      </span>
+      <div className="flex items-center h-full">
+        <span className="font-extrabold text-amber-950 font-mono text-sm">
+          ${amt.toFixed(2)}
+        </span>
+      </div>
     );
   };
 
@@ -142,13 +144,13 @@ export function SafePayApprovalsGrid({
     const score = Number(params.value ?? 50);
     const isHigh = score >= 70;
     return (
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 h-full">
         <span
           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
             isHigh ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
           }`}
         >
-          <ShieldAlert className="w-3 h-3" />
+          <ShieldAlert className="w-3 h-3 shrink-0" />
           <span>{score}/100</span>
         </span>
         <span className="text-[10px] text-slate-500 hidden sm:inline">
@@ -165,7 +167,7 @@ export function SafePayApprovalsGrid({
     const isThisDeciding = decidingId === data.id;
 
     return (
-      <div className="flex items-center gap-1.5 py-1">
+      <div className="flex items-center gap-1.5 h-full py-1">
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -197,6 +199,15 @@ export function SafePayApprovalsGrid({
     );
   }, [decidingId, onDecide]);
 
+  const defaultColDef = useMemo<ColDef>(() => {
+    return {
+      resizable: true,
+      sortable: true,
+      filter: true,
+      cellClass: 'flex items-center',
+    };
+  }, []);
+
   const columnDefs = useMemo<ColDef<SafePayApprovalRow>[]>(() => {
     return [
       {
@@ -204,14 +215,14 @@ export function SafePayApprovalsGrid({
         field: 'elderName',
         cellRenderer: ElderCellRenderer,
         flex: 1.2,
-        minWidth: 160,
+        minWidth: 150,
       },
       {
         headerName: 'Merchant & Category',
         field: 'merchantName',
         cellRenderer: MerchantCellRenderer,
         flex: 1.5,
-        minWidth: 180,
+        minWidth: 170,
       },
       {
         headerName: 'Amount',
@@ -238,10 +249,10 @@ export function SafePayApprovalsGrid({
           if (!val) return null;
           const d = new Date(val);
           return (
-            <span className="text-xs text-slate-600">
+            <div className="flex items-center h-full text-xs text-slate-600">
               {d.toLocaleDateString([], { month: 'short', day: 'numeric' })} at{' '}
               {d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
+            </div>
           );
         },
       },
@@ -264,14 +275,11 @@ export function SafePayApprovalsGrid({
             <Clock className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-950 flex items-center gap-1.5">
-              <span>{rowData.length} Order{rowData.length > 1 ? 's' : ''} Awaiting Approval</span>
-              <span className="text-[10px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                Interactive Grid
-              </span>
+            <h3 className="text-sm font-bold text-slate-950">
+              {rowData.length} Order{rowData.length > 1 ? 's' : ''} Awaiting Approval
             </h3>
             <p className="text-xs text-slate-500">
-              Filter by senior, risk rating, or execute one-click approvals
+              Execute one-click approvals or filter by senior
             </p>
           </div>
         </div>
@@ -303,14 +311,17 @@ export function SafePayApprovalsGrid({
       </div>
 
       <div
-        className="w-full rounded-2xl overflow-hidden border border-amber-200/90 shadow-xs bg-white"
-        style={{ height: rowData.length <= 4 ? `${Math.max(220, rowData.length * 60 + 90)}px` : '340px' }}
+        className="ag-theme-quartz w-full rounded-2xl overflow-hidden border border-amber-200/90 shadow-xs bg-white"
+        style={{ height: rowData.length <= 4 ? `${Math.max(220, rowData.length * 62 + 90)}px` : '360px' }}
       >
         <AgGridReact<SafePayApprovalRow>
           ref={gridRef}
           theme={approvalsTheme}
           rowData={rowData}
           columnDefs={columnDefs}
+          defaultColDef={defaultColDef}
+          rowHeight={56}
+          headerHeight={44}
           pagination={rowData.length > 5}
           paginationPageSize={5}
           rowSelection={{ mode: 'singleRow' }}

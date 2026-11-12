@@ -1764,7 +1764,7 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {/* AG Grid vs Cards View Switcher */}
+                    {/* View Switcher: Table vs Cards */}
                     <div className="flex items-center p-0.5 bg-slate-100 rounded-xl border border-slate-200 text-xs">
                       <button
                         onClick={() => setSeniorLedgerViewMode('grid')}
@@ -1773,10 +1773,10 @@ export default function DashboardPage() {
                             ? 'bg-white text-purple-900 shadow-2xs border border-purple-200/50'
                             : 'text-slate-600 hover:text-slate-900'
                         }`}
-                        title="High-performance AG Grid view"
+                        title="Table view"
                       >
                         <Table className="w-3.5 h-3.5 text-purple-600" />
-                        <span>AG Grid</span>
+                        <span>Table</span>
                       </button>
                       <button
                         onClick={() => setSeniorLedgerViewMode('cards')}
@@ -1797,8 +1797,6 @@ export default function DashboardPage() {
                 {seniorLedgerViewMode === 'grid' ? (
                   <SafePayLedgerGrid
                     rowData={seniorGridRows}
-                    title="Senior Transaction History"
-                    subtitle="Filter by category, search PayPal IDs, sort columns, or export CSV"
                   />
                 ) : (
                   <div className="space-y-4">
@@ -2827,10 +2825,10 @@ export default function DashboardPage() {
                             ? 'bg-white text-purple-900 shadow-2xs border border-purple-200/50'
                             : 'text-slate-600 hover:text-slate-900'
                         }`}
-                        title="Interactive AG Grid view"
+                        title="Table view"
                       >
                         <Table className="w-3.5 h-3.5 text-purple-600" />
-                        <span>AG Grid</span>
+                        <span>Table</span>
                       </button>
                       <button
                         onClick={() => setCaregiverApprovalsViewMode('cards')}
@@ -3117,42 +3115,33 @@ export default function DashboardPage() {
 
             {/* Comprehensive Transaction Ledger Section */}
             <div className="liquid-glass rounded-3xl p-6 border border-white/80 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-base font-bold text-slate-950">Past Transactions &amp; Audit Ledger</h3>
-                  <p className="text-xs text-slate-500">
-                    Detailed record of approved, held, and settled payments with high-performance AG Grid
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {/* View Switcher: AG Grid vs Cards */}
-                  <div className="flex items-center p-0.5 bg-slate-100/80 rounded-xl border border-slate-200 text-xs">
-                    <button
-                      onClick={() => setCaregiverLedgerViewMode('grid')}
-                      className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-semibold transition-all cursor-pointer ${
-                        caregiverLedgerViewMode === 'grid'
-                          ? 'bg-white text-purple-900 shadow-2xs border border-purple-200/50'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                      title="Interactive AG Grid view"
-                    >
-                      <Table className="w-3.5 h-3.5 text-purple-600" />
-                      <span>AG Grid</span>
-                    </button>
-                    <button
-                      onClick={() => setCaregiverLedgerViewMode('cards')}
-                      className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-semibold transition-all cursor-pointer ${
-                        caregiverLedgerViewMode === 'cards'
-                          ? 'bg-white text-purple-900 shadow-2xs border border-purple-200/50'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                      title="Cards dropdown view"
-                    >
-                      <LayoutList className="w-3.5 h-3.5 text-slate-500" />
-                      <span>Cards</span>
-                    </button>
-                  </div>
+              <div className="flex items-center justify-end">
+                {/* View Switcher: Table vs Cards */}
+                <div className="flex items-center p-0.5 bg-slate-100/80 rounded-xl border border-slate-200 text-xs">
+                  <button
+                    onClick={() => setCaregiverLedgerViewMode('grid')}
+                    className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-semibold transition-all cursor-pointer ${
+                      caregiverLedgerViewMode === 'grid'
+                        ? 'bg-white text-purple-900 shadow-2xs border border-purple-200/50'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                    title="Table view"
+                  >
+                    <Table className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Table</span>
+                  </button>
+                  <button
+                    onClick={() => setCaregiverLedgerViewMode('cards')}
+                    className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-semibold transition-all cursor-pointer ${
+                      caregiverLedgerViewMode === 'cards'
+                        ? 'bg-white text-purple-900 shadow-2xs border border-purple-200/50'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                    title="Cards dropdown view"
+                  >
+                    <LayoutList className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Cards</span>
+                  </button>
                 </div>
               </div>
 
@@ -3160,8 +3149,6 @@ export default function DashboardPage() {
                 <SafePayLedgerGrid
                   rowData={caregiverGridRows}
                   loading={ledgerLoading}
-                  title="Senior Transaction Audit"
-                  subtitle="Filter by category, search PayPal IDs, sort columns, or export CSV"
                 />
               ) : (
                 <div className="space-y-4">

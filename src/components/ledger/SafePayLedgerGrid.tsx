@@ -23,7 +23,6 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 
-// Register all community features
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 export interface SafePayGridRow {
@@ -44,21 +43,20 @@ interface SafePayLedgerGridProps {
   loading?: boolean;
   onRowClick?: (row: SafePayGridRow) => void;
   title?: string;
-  subtitle?: string;
 }
 
-// Clean custom Quartz theme matching SafePay design
+// Clean custom Quartz theme styled to match SafePay design
 const safePayGridTheme = themeQuartz.withParams({
-  accentColor: '#9333ea', // SafePay Purple
+  accentColor: '#9333ea',
   backgroundColor: '#ffffff',
-  borderColor: '#f1f5f9',
+  borderColor: '#e2e8f0',
   borderRadius: 16,
   headerBackgroundColor: '#f8fafc',
   headerTextColor: '#0f172a',
   headerFontWeight: 700,
   headerFontSize: 12,
   fontSize: 13,
-  rowHoverColor: '#fbf9ff',
+  rowHoverColor: '#faf5ff',
   selectedRowBackgroundColor: '#f5f3ff',
 });
 
@@ -66,8 +64,7 @@ export function SafePayLedgerGrid({
   rowData,
   loading = false,
   onRowClick,
-  title = 'Interactive Transaction Ledger',
-  subtitle = 'High-performance AG Grid with multi-column sorting, filtering, and export',
+  title,
 }: SafePayLedgerGridProps) {
   const gridRef = useRef<AgGridReact<SafePayGridRow>>(null);
   const [gridApi, setGridApi] = useState<GridApi<SafePayGridRow> | null>(null);
@@ -82,7 +79,7 @@ export function SafePayLedgerGrid({
   const handleExportCsv = useCallback(() => {
     if (gridApi) {
       gridApi.exportDataAsCsv({
-        fileName: `safepay-ledger-${new Date().toISOString().slice(0, 10)}.csv`,
+        fileName: `safepay-transactions-${new Date().toISOString().slice(0, 10)}.csv`,
       });
     }
   }, [gridApi]);
@@ -92,25 +89,31 @@ export function SafePayLedgerGrid({
     const status = (params.value || '').toUpperCase();
     if (['SETTLED', 'APPROVED', 'APPROVED_FOR_CHECKOUT', 'READY_FOR_CHECKOUT'].includes(status)) {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-          <span>Settled</span>
-        </span>
+        <div className="flex items-center h-full">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+            <span>Settled</span>
+          </span>
+        </div>
       );
     }
     if (['AWAITING_FAMILY', 'WAITING', 'CAPTURE_PENDING', 'CHECKOUT_IN_PROGRESS'].includes(status)) {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
-          <Clock className="w-3 h-3 text-amber-600" />
-          <span>Held for Review</span>
-        </span>
+        <div className="flex items-center h-full">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
+            <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+            <span>Held for Review</span>
+          </span>
+        </div>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-        <XCircle className="w-3 h-3 text-rose-600" />
-        <span>Declined</span>
-      </span>
+      <div className="flex items-center h-full">
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+          <XCircle className="w-3 h-3 text-rose-600 shrink-0" />
+          <span>Declined</span>
+        </span>
+      </div>
     );
   };
 
@@ -119,20 +122,20 @@ export function SafePayLedgerGrid({
     const data = params.data;
     if (!data) return null;
     return (
-      <div className="flex items-center gap-2.5 py-1">
+      <div className="flex items-center gap-2.5 h-full w-full overflow-hidden py-1">
         <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold">
           <Store className="w-3.5 h-3.5" />
         </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 leading-tight">
-            <span className="font-bold text-slate-900 truncate">{data.merchantName}</span>
+        <div className="min-w-0 flex-1 overflow-hidden leading-tight">
+          <div className="flex items-center gap-1.5">
+            <span className="font-bold text-slate-900 truncate text-xs">{data.merchantName}</span>
             {data.isTrusted && (
               <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 shrink-0">
                 Trusted
               </span>
             )}
           </div>
-          <span className="text-[10px] text-slate-400 block truncate">{data.category}</span>
+          <span className="text-[11px] text-slate-400 block truncate mt-0.5">{data.category}</span>
         </div>
       </div>
     );
@@ -145,7 +148,7 @@ export function SafePayLedgerGrid({
     const isMed = score >= 40 && score < 70;
 
     return (
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 h-full">
         <span
           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${
             isHigh
@@ -156,13 +159,13 @@ export function SafePayLedgerGrid({
           }`}
         >
           {isHigh ? (
-            <AlertTriangle className="w-3 h-3 text-rose-600" />
+            <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
           ) : (
-            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+            <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" />
           )}
           <span>{score}/100</span>
         </span>
-        <span className="text-[10px] text-slate-400">
+        <span className="text-[10px] text-slate-400 hidden sm:inline">
           {isHigh ? 'High' : isMed ? 'Review' : 'Safe'}
         </span>
       </div>
@@ -173,9 +176,11 @@ export function SafePayLedgerGrid({
   const AmountCellRenderer = (params: ICellRendererParams<SafePayGridRow>) => {
     const amt = Number(params.value || 0);
     return (
-      <span className="font-extrabold text-slate-900 font-mono text-sm">
-        ${amt.toFixed(2)}
-      </span>
+      <div className="flex items-center h-full">
+        <span className="font-extrabold text-slate-900 font-mono text-sm">
+          ${amt.toFixed(2)}
+        </span>
+      </div>
     );
   };
 
@@ -184,16 +189,24 @@ export function SafePayLedgerGrid({
     if (!params.value) return <span className="text-slate-400 text-xs">-</span>;
     const d = new Date(params.value);
     return (
-      <div className="text-xs text-slate-600 leading-tight">
-        <div>{d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-        <div className="text-[10px] text-slate-400">
+      <div className="flex flex-col justify-center h-full text-xs text-slate-600 leading-tight">
+        <div className="font-medium text-slate-800">{d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+        <div className="text-[10px] text-slate-400 mt-0.5">
           {d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
     );
   };
 
-  // Column definitions
+  const defaultColDef = useMemo<ColDef>(() => {
+    return {
+      resizable: true,
+      sortable: true,
+      filter: true,
+      cellClass: 'flex items-center',
+    };
+  }, []);
+
   const columnDefs = useMemo<ColDef<SafePayGridRow>[]>(() => {
     return [
       {
@@ -201,15 +214,15 @@ export function SafePayLedgerGrid({
         field: 'merchantName',
         cellRenderer: MerchantCellRenderer,
         flex: 2,
-        minWidth: 220,
+        minWidth: 200,
         filter: 'agTextColumnFilter',
       },
       {
-        headerName: 'Amount (USD)',
+        headerName: 'Amount',
         field: 'amount',
         cellRenderer: AmountCellRenderer,
         flex: 1,
-        minWidth: 120,
+        minWidth: 110,
         sort: 'desc',
         filter: 'agNumberColumnFilter',
       },
@@ -218,15 +231,15 @@ export function SafePayLedgerGrid({
         field: 'status',
         cellRenderer: StatusCellRenderer,
         flex: 1.2,
-        minWidth: 150,
+        minWidth: 140,
         filter: 'agTextColumnFilter',
       },
       {
-        headerName: 'SafePay AI Risk',
+        headerName: 'SafePay Risk',
         field: 'riskScore',
         cellRenderer: RiskCellRenderer,
         flex: 1.2,
-        minWidth: 150,
+        minWidth: 130,
         filter: 'agNumberColumnFilter',
       },
       {
@@ -240,18 +253,19 @@ export function SafePayLedgerGrid({
       {
         headerName: 'Transaction ID',
         field: 'id',
-        flex: 1.2,
-        minWidth: 140,
+        flex: 1.1,
+        minWidth: 130,
         cellRenderer: (params: ICellRendererParams) => (
-          <span className="font-mono text-[11px] text-slate-500 truncate block">
-            {params.value}
-          </span>
+          <div className="flex items-center h-full w-full overflow-hidden">
+            <span className="font-mono text-[11px] text-slate-500 truncate block">
+              {params.value}
+            </span>
+          </div>
         ),
       },
     ];
   }, []);
 
-  // Filtered rows by status tab
   const filteredData = useMemo(() => {
     return rowData.filter((row) => {
       if (statusFilter === 'ALL') return true;
@@ -273,22 +287,58 @@ export function SafePayLedgerGrid({
     <div className="space-y-3.5">
       {/* Top Header & Search / Export Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <h3 className="text-sm font-bold text-slate-950 flex items-center gap-1.5">
-              <span>{title}</span>
-              <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
-                AG Grid Engine
-              </span>
-            </h3>
+        <div className="flex items-center gap-2">
+          {title && (
+            <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+          )}
+          {/* Status Filter Badges */}
+          <div className="flex flex-wrap items-center gap-1 p-0.5 bg-slate-100 rounded-xl border border-slate-200/80 text-xs">
+            <button
+              onClick={() => setStatusFilter('ALL')}
+              className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                statusFilter === 'ALL'
+                  ? 'bg-white text-slate-950 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-950'
+              }`}
+            >
+              All ({rowData.length})
+            </button>
+            <button
+              onClick={() => setStatusFilter('SETTLED')}
+              className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                statusFilter === 'SETTLED'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-950'
+              }`}
+            >
+              Settled
+            </button>
+            <button
+              onClick={() => setStatusFilter('AWAITING')}
+              className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                statusFilter === 'AWAITING'
+                  ? 'bg-amber-500 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-950'
+              }`}
+            >
+              Held
+            </button>
+            <button
+              onClick={() => setStatusFilter('DECLINED')}
+              className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                statusFilter === 'DECLINED'
+                  ? 'bg-rose-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-950'
+              }`}
+            >
+              Declined
+            </button>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          {/* Quick Search Input */}
-          <div className="relative flex-1 sm:w-60">
+          {/* Search Input */}
+          <div className="relative flex-1 sm:w-56">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -297,7 +347,7 @@ export function SafePayLedgerGrid({
                 setQuickFilterText(e.target.value);
                 if (gridApi) gridApi.setGridOption('quickFilterText', e.target.value);
               }}
-              placeholder="Search all columns..."
+              placeholder="Search table..."
               className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-purple-600/20"
             />
           </div>
@@ -309,65 +359,24 @@ export function SafePayLedgerGrid({
             className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors shrink-0 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span className="hidden sm:inline">Export CSV</span>
+            <span className="hidden sm:inline">Export</span>
           </button>
         </div>
       </div>
 
-      {/* Status Filter Badges */}
-      <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100/70 rounded-xl border border-slate-200/60 w-fit text-xs">
-        <button
-          onClick={() => setStatusFilter('ALL')}
-          className={`px-3 py-1 rounded-lg font-semibold transition-all ${
-            statusFilter === 'ALL'
-              ? 'bg-slate-950 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-950'
-          }`}
-        >
-          All ({rowData.length})
-        </button>
-        <button
-          onClick={() => setStatusFilter('SETTLED')}
-          className={`px-3 py-1 rounded-lg font-semibold transition-all ${
-            statusFilter === 'SETTLED'
-              ? 'bg-emerald-600 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-950'
-          }`}
-        >
-          Settled
-        </button>
-        <button
-          onClick={() => setStatusFilter('AWAITING')}
-          className={`px-3 py-1 rounded-lg font-semibold transition-all ${
-            statusFilter === 'AWAITING'
-              ? 'bg-amber-500 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-950'
-          }`}
-        >
-          Held / Review
-        </button>
-        <button
-          onClick={() => setStatusFilter('DECLINED')}
-          className={`px-3 py-1 rounded-lg font-semibold transition-all ${
-            statusFilter === 'DECLINED'
-              ? 'bg-rose-600 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-950'
-          }`}
-        >
-          Declined
-        </button>
-      </div>
-
       {/* The AG Grid Table */}
       <div
-        className="w-full rounded-2xl overflow-hidden border border-slate-200/90 shadow-xs bg-white"
-        style={{ height: '440px' }}
+        className="ag-theme-quartz w-full rounded-2xl overflow-hidden border border-slate-200/90 shadow-xs bg-white"
+        style={{ height: '460px' }}
       >
         <AgGridReact<SafePayGridRow>
           ref={gridRef}
           theme={safePayGridTheme}
           rowData={filteredData}
           columnDefs={columnDefs}
+          defaultColDef={defaultColDef}
+          rowHeight={56}
+          headerHeight={44}
           pagination={true}
           paginationPageSize={10}
           paginationPageSizeSelector={[10, 25, 50, 100]}
@@ -391,7 +400,7 @@ export function SafePayLedgerGrid({
           <span>Showing <strong>{filteredData.length}</strong> of <strong>{rowData.length}</strong> transactions</span>
         </span>
         <span className="hidden sm:inline text-slate-400">
-          Tip: Click column headers to sort &bull; Drag to reorder &bull; Filter icon in headers
+          Click column headers to sort &bull; Drag to reorder columns
         </span>
       </div>
     </div>
