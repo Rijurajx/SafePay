@@ -4,7 +4,6 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  ShieldCheck,
   CheckCircle2,
   XCircle,
   AlertTriangle,
@@ -15,6 +14,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
+import { SafePayLogo } from '@/components/brand/SafePayLogo';
 
 interface InvitationDetails {
   caregiverId: string;
@@ -195,9 +195,7 @@ function InvitationAcceptContent() {
     <div className="min-h-screen soft-mesh-bg text-slate-900 flex flex-col justify-center items-center px-4 sm:px-6 py-12 relative">
       {/* Brand Header */}
       <Link href="/" className="mb-6 flex items-center gap-2 group">
-        <div className="w-9 h-9 rounded-full bg-slate-950 text-white flex items-center justify-center shadow-xs">
-          <ShieldCheck className="w-5 h-5 text-emerald-400" />
-        </div>
+        <SafePayLogo size="md" className="group-hover:scale-105" priority />
         <span className="font-bold tracking-tight text-lg text-slate-900">SafePay</span>
       </Link>
 

@@ -2,8 +2,12 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Protected Money Companion | Financial Protection & Oversight',
-  description: 'AI-assisted financial protection and dual-gate payment authorization platform.',
+  title: 'SafePay | A Little Shelter for Every Payment',
+  description: 'AI-assisted financial protection and dual-gate payment authorization platform with PayPal Companion safeguards.',
+  icons: {
+    icon: '/safepay-logo.png',
+    apple: '/safepay-logo.png',
+  },
 };
 
 export default function RootLayout({

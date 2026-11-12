@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { SessionUser } from '@/types';
 import { LunaMascot } from '@/components/mascot/LunaMascot';
+import { SafePayLogo } from '@/components/brand/SafePayLogo';
 import {
   ShieldCheck,
   ChevronDown,
@@ -159,9 +160,7 @@ export default function HomePage() {
       <nav className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-3xl liquid-glass rounded-full px-6 py-2.5 flex items-center justify-between shadow-[0_12px_36px_rgba(0,0,0,0.06)] border border-white/80 transition-all duration-200">
         {/* Brand */}
         <Link href="/" className="flex items-center gap-2.5 group shrink-0">
-          <div className="w-8 h-8 rounded-full bg-slate-950 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-            <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
-          </div>
+          <SafePayLogo size="sm" className="group-hover:scale-105" priority />
           <span className="font-bold tracking-tight text-sm text-slate-950">SafePay</span>
         </Link>
 
@@ -913,10 +912,8 @@ export default function HomePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
             {/* Column 1: Brand & Tagline */}
             <div className="space-y-3">
-              <Link href="/" className="flex items-center gap-2 group">
-                <div className="w-7 h-7 rounded-full bg-slate-950 text-white flex items-center justify-center shadow-xs">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                </div>
+              <Link href="/" className="flex items-center gap-2.5 group">
+                <SafePayLogo size="xs" className="group-hover:scale-105" />
                 <span className="font-bold text-slate-900 text-sm">SafePay</span>
               </Link>
               <p className="text-xs text-slate-500 leading-relaxed">

@@ -22,6 +22,7 @@ import {
   Lock,
   X,
 } from 'lucide-react';
+import { SafePayLogo } from '@/components/brand/SafePayLogo';
 
 interface CountryCodeOption {
   code: string;
@@ -238,9 +239,7 @@ export default function OnboardingPage() {
       <div className="max-w-7xl w-full mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-black/5">
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-full bg-slate-950 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            </div>
+            <SafePayLogo size="sm" className="group-hover:scale-105" priority />
             <span className="font-bold tracking-tight text-base text-slate-950">SafePay</span>
           </Link>
           <div className="h-4 w-px bg-slate-200 hidden sm:block" />

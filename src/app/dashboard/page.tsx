@@ -44,6 +44,7 @@ import {
 import { SessionUser, DemoPersonaKey } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 import { LunaMascot } from '@/components/mascot/LunaMascot';
+import { SafePayLogo } from '@/components/brand/SafePayLogo';
 
 interface LinkedElder {
   id: string;
@@ -1098,9 +1099,7 @@ export default function DashboardPage() {
         {/* MOBILE TOP BAR */}
         <div className="md:hidden flex items-center justify-between p-4 bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-40">
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-xl bg-slate-950 text-white flex items-center justify-center shadow-xs">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            </div>
+            <SafePayLogo size="xs" />
             <div>
               <span className="font-bold tracking-tight text-sm text-slate-950">SafePay</span>
               <span className="ml-1.5 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
@@ -1140,9 +1139,7 @@ export default function DashboardPage() {
           <div>
             <div className={`h-16 border-b border-slate-100 flex items-center overflow-hidden transition-all duration-300 ${seniorSidebarCollapsed ? 'justify-center px-0' : 'px-4'}`}>
               <Link href="/" className="flex items-center gap-2.5 min-w-0 group" title="SafePay - Senior Shield">
-                <div className="w-9 h-9 rounded-2xl bg-slate-950 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
-                  <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
-                </div>
+                <SafePayLogo size="sm" className="group-hover:scale-105" />
                 <div
                   className={`flex flex-col overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                     seniorSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none ml-0' : 'max-w-[170px] opacity-100'
@@ -2207,9 +2204,7 @@ export default function DashboardPage() {
         {/* Top Header & Brand */}
         <div className={`h-16 border-b border-slate-200/60 flex items-center overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'justify-center px-0' : 'px-4'}`}>
           <Link href="/" className="flex items-center gap-2.5 min-w-0 group" title="SafePay - Caregiver Shield">
-            <div className="w-9 h-9 rounded-2xl bg-slate-950 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
-              <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
-            </div>
+            <SafePayLogo size="sm" className="group-hover:scale-105" />
             <div
               className={`flex flex-col overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                 isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none ml-0' : 'max-w-[170px] opacity-100'

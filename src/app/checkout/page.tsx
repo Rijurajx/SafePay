@@ -16,6 +16,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { SessionUser } from '@/types';
+import { SafePayLogo } from '@/components/brand/SafePayLogo';
 
 interface PresetItem {
   id: string;
@@ -285,9 +286,7 @@ function CheckoutContent() {
               <ArrowLeft className="w-4 h-4" />
             </Link>
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-slate-950 text-white flex items-center justify-center shadow-xs">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              </div>
+              <SafePayLogo size="xs" />
               <span className="font-bold tracking-tight text-sm text-slate-950">SafePay Checkout Sandbox</span>
             </div>
           </div>

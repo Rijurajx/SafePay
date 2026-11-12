@@ -3,8 +3,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { SafePayLogo } from '@/components/brand/SafePayLogo';
 import {
-  ShieldCheck,
   ArrowRight,
   Lock,
   Mail,
@@ -387,9 +387,7 @@ export default function SignUpPage() {
     <div className="min-h-screen soft-mesh-bg text-slate-900 flex flex-col justify-center items-center px-4 sm:px-6 py-12 relative">
       {/* Brand Header */}
       <Link href="/" className="mb-8 flex items-center gap-2.5 group">
-        <div className="w-9 h-9 rounded-full bg-slate-950 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-          <ShieldCheck className="w-5 h-5 text-emerald-400" />
-        </div>
+        <SafePayLogo size="md" className="group-hover:scale-105" priority />
         <span className="font-bold tracking-tight text-lg text-slate-900">SafePay</span>
       </Link>
 
