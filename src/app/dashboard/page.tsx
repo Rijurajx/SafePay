@@ -38,6 +38,8 @@ import {
   ReceiptText,
   Play,
   CreditCard,
+  Lock,
+  Mail,
 } from 'lucide-react';
 import { SessionUser, DemoPersonaKey } from '@/types';
 import { createClient } from '@/lib/supabase/client';
@@ -53,6 +55,8 @@ interface LinkedElder {
   emergencyContactName?: string | null;
   emergencyContactPhone?: string | null;
   relationship: string;
+  paypalEmail?: string | null;
+  paypalAccountId?: string | null;
   permission: {
     canView: boolean;
     canApprove: boolean;
@@ -358,6 +362,13 @@ export default function DashboardPage() {
   const [profileEmergencyPhone, setProfileEmergencyPhone] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+
+  // PayPal account edit/disconnect modal state
+  const [isPaypalEditModalOpen, setIsPaypalEditModalOpen] = useState(false);
+  const [editPaypalEmail, setEditPaypalEmail] = useState('');
+  const [editPaypalPassword, setEditPaypalPassword] = useState('');
+  const [paypalUpdating, setPaypalUpdating] = useState(false);
+  const [paypalError, setPaypalError] = useState<string | null>(null);
 
   // Safety limits edit modal state
   const [isLimitsModalOpen, setIsLimitsModalOpen] = useState(false);
@@ -723,6 +734,77 @@ export default function DashboardPage() {
       setProfileError('Network error updating profile');
     } finally {
       setProfileSaving(false);
+    }
+  };
+
+  const handleSavePaypalAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editPaypalEmail.trim()) {
+      setPaypalError('Please enter a valid PayPal account email');
+      return;
+    }
+    setPaypalUpdating(true);
+    setPaypalError(null);
+    try {
+      const res = await fetch('/api/auth/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paypalEmail: editPaypalEmail.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPaypalError(data.error || 'Failed to link PayPal account');
+      } else {
+        if (currentUser && data.user) {
+          setCurrentUser({ ...currentUser, ...(data.user as Partial<SessionUser>) });
+        }
+        setActionNotice({
+          message: `PayPal wallet successfully connected: ${editPaypalEmail.trim()}`,
+          type: 'success',
+        });
+        setIsPaypalEditModalOpen(false);
+        await fetchSummary();
+      }
+    } catch {
+      setPaypalError('Network error connecting PayPal account');
+    } finally {
+      setPaypalUpdating(false);
+    }
+  };
+
+  const handleDisconnectPaypal = async () => {
+    if (!window.confirm('Disconnect this PayPal account from senior checkouts?')) {
+      return;
+    }
+    setPaypalUpdating(true);
+    try {
+      const res = await fetch('/api/auth/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          disconnectPaypal: true,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.user) {
+        if (currentUser) {
+          setCurrentUser({ ...currentUser, ...(data.user as Partial<SessionUser>) });
+        }
+        setActionNotice({
+          message: 'PayPal wallet disconnected successfully',
+          type: 'info',
+        });
+        await fetchSummary();
+      }
+    } catch {
+      setActionNotice({
+        message: 'Failed to disconnect PayPal wallet',
+        type: 'error',
+      });
+    } finally {
+      setPaypalUpdating(false);
     }
   };
 
@@ -3672,6 +3754,101 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+
+            {/* PayPal Payment & Checkout Account Card */}
+            <div className="liquid-glass rounded-3xl p-6 sm:p-8 border border-white/80 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-[#003087]/10 text-[#003087] flex items-center justify-center font-bold text-lg">
+                    <CreditCard className="w-6 h-6 text-[#0070ba]" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-950">PayPal Senior Checkout Wallet</h3>
+                    <p className="text-xs text-slate-500">Connected account utilized for elder purchases and automated sandbox settlement</p>
+                  </div>
+                </div>
+
+                {(currentUser?.paypalEmail || activeElder?.paypalEmail) ? (
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1.5 w-fit">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>Active &amp; Connected</span>
+                  </span>
+                ) : (
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200 w-fit">
+                    Not Linked
+                  </span>
+                )}
+              </div>
+
+              {(currentUser?.paypalEmail || activeElder?.paypalEmail) ? (
+                <div className="p-4 rounded-2xl bg-white/90 border border-slate-200/70 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#003087] text-white flex items-center justify-center font-black text-base shadow-xs shrink-0">
+                        P
+                      </div>
+                      <div className="min-w-0">
+                        <span className="font-extrabold text-sm text-slate-950 block font-mono truncate">
+                          {currentUser?.paypalEmail || activeElder?.paypalEmail}
+                        </span>
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                          <span>Account ID: {currentUser?.paypalAccountId || activeElder?.paypalAccountId || 'PP-WAL-784210'}</span>
+                          <span>•</span>
+                          <span>PayPal Sandbox Companion</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => {
+                          setEditPaypalEmail(currentUser?.paypalEmail || activeElder?.paypalEmail || '');
+                          setIsPaypalEditModalOpen(true);
+                        }}
+                        className="px-3.5 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <Edit2 className="w-3 h-3 text-slate-600" />
+                        <span>Change Account</span>
+                      </button>
+                      <button
+                        onClick={handleDisconnectPaypal}
+                        disabled={paypalUpdating}
+                        className="px-3.5 py-1.5 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                      >
+                        <X className="w-3 h-3 text-rose-600" />
+                        <span>Disconnect</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-slate-500">
+                    <span>Protection Routing: Real-Time Family Hold Gateways Active</span>
+                    <span className="text-emerald-600 font-semibold">1-Tap Caregiver Authorization</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-semibold text-slate-800">
+                      No PayPal account connected for elder purchases
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Link a PayPal wallet so your senior can shop independently while SafePay guards every transaction.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setEditPaypalEmail(activeElder?.email || 'senior-buyer@personal.example.com');
+                      setIsPaypalEditModalOpen(true);
+                    }}
+                    className="px-4 py-2 rounded-full bg-[#0070ba] hover:bg-[#005ea6] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
+                  >
+                    <span>Connect PayPal Account</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>
@@ -4162,6 +4339,109 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsLimitsModalOpen(false)}
+                  className="px-4 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* PAYPAL ACCOUNT EDIT / CONNECT MODAL */}
+      {isPaypalEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full border border-slate-200 shadow-2xl relative space-y-4">
+            <button
+              type="button"
+              onClick={() => setIsPaypalEditModalOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+              <div className="w-10 h-10 rounded-xl bg-[#003087] text-white flex items-center justify-center font-black text-lg tracking-tighter shadow-xs">
+                P
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-950">PayPal Senior Checkout Wallet</h3>
+                <p className="text-[11px] text-slate-500">Link PayPal account for autonomous senior checkouts</p>
+              </div>
+            </div>
+
+            {paypalError && (
+              <div className="p-3 bg-rose-50 text-rose-800 border border-rose-200 rounded-xl text-xs font-medium">
+                {paypalError}
+              </div>
+            )}
+
+            <form onSubmit={handleSavePaypalAccount} className="space-y-3 pt-1">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  PayPal Account Email
+                </label>
+                <div className="relative">
+                  <Mail className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="email"
+                    required
+                    value={editPaypalEmail}
+                    onChange={(e) => setEditPaypalEmail(e.target.value)}
+                    placeholder="senior-buyer@personal.example.com"
+                    className="w-full pl-8 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-medium focus:border-[#0070ba] focus:bg-white focus:ring-2 focus:ring-[#0070ba]/20 outline-none transition-all font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  PayPal Account Password
+                </label>
+                <div className="relative">
+                  <Lock className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="password"
+                    value={editPaypalPassword}
+                    onChange={(e) => setEditPaypalPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full pl-8 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-medium focus:border-[#0070ba] focus:bg-white focus:ring-2 focus:ring-[#0070ba]/20 outline-none transition-all font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-600 space-y-1 leading-relaxed">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>SafePay Companion Shield Active</span>
+                </div>
+                <p className="text-[10px] text-slate-500">
+                  All checkout requests from this PayPal account will be automatically guarded by SafePay. Anomalous payments are held until you review them.
+                </p>
+              </div>
+
+              <div className="pt-2 flex items-center gap-2">
+                <button
+                  type="submit"
+                  disabled={paypalUpdating || !editPaypalEmail.trim()}
+                  className="flex-1 py-2.5 rounded-full bg-[#0070ba] hover:bg-[#005ea6] text-white text-xs font-bold transition-all shadow-md shadow-[#0070ba]/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {paypalUpdating ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Linking PayPal...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Save &amp; Link PayPal Account</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPaypalEditModalOpen(false)}
                   className="px-4 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
                 >
                   Cancel

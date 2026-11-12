@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
       requireFamilyForUnusual = true,
       emergencyContactName,
       emergencyContactPhone,
+      paypalEmail,
+      paypalAccountId,
     } = body;
 
     let caregiverName = session.fullName;
@@ -46,6 +48,9 @@ export async function POST(req: NextRequest) {
     const caregiverData: Prisma.UserUpdateInput & {
       phoneNumber?: string | null;
       preferredNotification?: string | null;
+      paypalEmail?: string | null;
+      paypalAccountId?: string | null;
+      paypalConnectedAt?: Date | null;
     } = {};
     if (fullName && typeof fullName === 'string' && fullName.trim()) {
       caregiverName = fullName.trim();
@@ -56,6 +61,13 @@ export async function POST(req: NextRequest) {
     }
     if (caregiverNotification) {
       caregiverData.preferredNotification = String(caregiverNotification).trim();
+    }
+    if (paypalEmail && typeof paypalEmail === 'string' && paypalEmail.trim()) {
+      caregiverData.paypalEmail = paypalEmail.trim();
+      caregiverData.paypalAccountId = paypalAccountId
+        ? String(paypalAccountId).trim()
+        : `PP-WAL-${Math.floor(100000 + Math.random() * 900000)}`;
+      caregiverData.paypalConnectedAt = new Date();
     }
 
     if (Object.keys(caregiverData).length > 0) {
@@ -96,6 +108,9 @@ export async function POST(req: NextRequest) {
         primaryZipCode?: string | null;
         emergencyContactName?: string | null;
         emergencyContactPhone?: string | null;
+        paypalEmail?: string | null;
+        paypalAccountId?: string | null;
+        paypalConnectedAt?: Date | null;
       } = {
         fullName: trimmedElderName,
         ...(elderPhone ? { phoneNumber: String(elderPhone).trim() } : {}),
@@ -103,6 +118,13 @@ export async function POST(req: NextRequest) {
         ...(elderZipCode ? { primaryZipCode: String(elderZipCode).trim() } : {}),
         ...(emergencyContactName ? { emergencyContactName: String(emergencyContactName).trim() } : {}),
         ...(emergencyContactPhone ? { emergencyContactPhone: String(emergencyContactPhone).trim() } : {}),
+        ...(caregiverData.paypalEmail
+          ? {
+              paypalEmail: caregiverData.paypalEmail,
+              paypalAccountId: caregiverData.paypalAccountId,
+              paypalConnectedAt: caregiverData.paypalConnectedAt,
+            }
+          : {}),
       };
 
       if (!elder) {
@@ -115,6 +137,13 @@ export async function POST(req: NextRequest) {
             ...(elderZipCode ? { primaryZipCode: String(elderZipCode).trim() } : {}),
             ...(emergencyContactName ? { emergencyContactName: String(emergencyContactName).trim() } : {}),
             ...(emergencyContactPhone ? { emergencyContactPhone: String(emergencyContactPhone).trim() } : {}),
+            ...(caregiverData.paypalEmail
+              ? {
+                  paypalEmail: caregiverData.paypalEmail,
+                  paypalAccountId: caregiverData.paypalAccountId,
+                  paypalConnectedAt: caregiverData.paypalConnectedAt,
+                }
+              : {}),
             roleDefault: Role.PROTECTED_USER,
             isActive: false, // Inactive until elder accepts invite
             isSynthetic: false,

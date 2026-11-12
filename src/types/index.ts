@@ -28,6 +28,9 @@ export interface SessionUser {
   emergencyContactName?: string | null;
   emergencyContactPhone?: string | null;
   preferredNotification?: string | null;
+  paypalEmail?: string | null;
+  paypalAccountId?: string | null;
+  paypalConnectedAt?: string | null;
 }
 
 export interface CaregiverContext {

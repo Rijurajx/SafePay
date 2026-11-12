@@ -18,6 +18,9 @@ import {
   MapPin,
   Heart,
   ChevronDown,
+  CreditCard,
+  Lock,
+  X,
 } from 'lucide-react';
 
 interface CountryCodeOption {
@@ -91,6 +94,15 @@ export default function OnboardingPage() {
   const [requireNewMerchant, setRequireNewMerchant] = useState(true);
   const [requireUnusual, setRequireUnusual] = useState(true);
 
+  // PayPal Account State for Senior Purchases
+  const [paypalConnected, setPaypalConnected] = useState(false);
+  const [paypalEmail, setPaypalEmail] = useState('');
+  const [paypalAccountId, setPaypalAccountId] = useState('');
+  const [isPaypalModalOpen, setIsPaypalModalOpen] = useState(false);
+  const [paypalAuthEmail, setPaypalAuthEmail] = useState('');
+  const [paypalAuthPassword, setPaypalAuthPassword] = useState('');
+  const [paypalConnecting, setPaypalConnecting] = useState(false);
+
   // Success state with generated invite
   const [createdInvite, setCreatedInvite] = useState<{
     elderName: string;
@@ -127,6 +139,11 @@ export default function OnboardingPage() {
           }
           if (data.user.preferredNotification) {
             setCaregiverNotification(data.user.preferredNotification);
+          }
+          if (data.user.paypalEmail) {
+            setPaypalConnected(true);
+            setPaypalEmail(data.user.paypalEmail);
+            setPaypalAccountId(data.user.paypalAccountId || 'PP-WAL-784210');
           }
         }
       } catch (err) {
@@ -176,6 +193,8 @@ export default function OnboardingPage() {
           monthlyBudget: Number(monthlyBudget) || 2000,
           requireFamilyForNewRecipient: requireNewMerchant,
           requireFamilyForUnusual: requireUnusual,
+          paypalEmail: paypalConnected && paypalEmail.trim() ? paypalEmail.trim() : undefined,
+          paypalAccountId: paypalConnected && paypalAccountId.trim() ? paypalAccountId.trim() : undefined,
         }),
       });
 
@@ -654,6 +673,96 @@ export default function OnboardingPage() {
                     </div>
                   </label>
                 </div>
+
+                {/* Senior PayPal Checkout Account */}
+                <div className="pt-2 border-t border-slate-200/60">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <CreditCard className="w-3.5 h-3.5 text-[#0070ba]" />
+                      <span className="text-[11px] font-bold text-slate-900">Senior PayPal Account</span>
+                    </div>
+                    {paypalConnected && (
+                      <span className="text-[10px] font-semibold text-emerald-600 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                        Connected
+                      </span>
+                    )}
+                  </div>
+
+                  {paypalConnected ? (
+                    <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/80 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-6 h-6 rounded-lg bg-[#003087] text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                            P
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold text-slate-900 block truncate font-mono">
+                              {paypalEmail}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono block">
+                              ID: {paypalAccountId || 'PP-WAL-784210'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPaypalAuthEmail(paypalEmail);
+                              setIsPaypalModalOpen(true);
+                            }}
+                            className="text-[10px] font-semibold text-blue-700 hover:text-blue-900 px-2 py-0.5 rounded-md hover:bg-blue-100/60 transition-colors cursor-pointer"
+                          >
+                            Change
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPaypalConnected(false);
+                              setPaypalEmail('');
+                              setPaypalAccountId('');
+                            }}
+                            className="text-[10px] font-semibold text-rose-600 hover:text-rose-800 px-2 py-0.5 rounded-md hover:bg-rose-100/60 transition-colors cursor-pointer"
+                          >
+                            Disconnect
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-blue-900/80 leading-tight">
+                        Active payment wallet for senior checkouts. Companion safeguards enforce limits before capture.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-6 h-6 rounded-lg bg-[#003087] text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                          P
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-xs font-bold text-slate-800 block truncate">Link PayPal Wallet</span>
+                          <span className="text-[10px] text-slate-500 block">Enables autonomous checkout</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const suggested = elderEmailOrPhone?.includes('@')
+                            ? elderEmailOrPhone.trim().toLowerCase()
+                            : elderFullName.trim()
+                            ? `${elderFullName.trim().toLowerCase().replace(/\s+/g, '.')}-buyer@personal.example.com`
+                            : 'senior-buyer@personal.example.com';
+                          setPaypalAuthEmail(suggested);
+                          setIsPaypalModalOpen(true);
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-[#0070ba] hover:bg-[#005ea6] text-white text-[11px] font-bold transition-all shadow-2xs flex items-center gap-1 shrink-0 cursor-pointer"
+                      >
+                        <span>Connect</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -738,6 +847,105 @@ export default function OnboardingPage() {
               <span>Enter Caregiver Dashboard</span>
               <ArrowRight className="w-4 h-4 text-emerald-400" />
             </Link>
+          </div>
+        </div>
+      )}
+
+      {/* PAYPAL ACCOUNT CONNECTION MODAL */}
+      {isPaypalModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full border border-slate-200 shadow-2xl relative space-y-4">
+            <button
+              type="button"
+              onClick={() => setIsPaypalModalOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+              <div className="w-10 h-10 rounded-xl bg-[#003087] text-white flex items-center justify-center font-black text-lg tracking-tighter shadow-xs">
+                P
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-950">Link PayPal Wallet</h3>
+                <p className="text-[11px] text-slate-500">Secure connection powered by SafePay Companion</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-1">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  PayPal Account Email
+                </label>
+                <div className="relative">
+                  <Mail className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="email"
+                    value={paypalAuthEmail}
+                    onChange={(e) => setPaypalAuthEmail(e.target.value)}
+                    placeholder="senior-buyer@personal.example.com"
+                    className="w-full pl-8 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-medium focus:border-[#0070ba] focus:bg-white focus:ring-2 focus:ring-[#0070ba]/20 outline-none transition-all font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  PayPal Account Password
+                </label>
+                <div className="relative">
+                  <Lock className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="password"
+                    value={paypalAuthPassword}
+                    onChange={(e) => setPaypalAuthPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full pl-8 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-medium focus:border-[#0070ba] focus:bg-white focus:ring-2 focus:ring-[#0070ba]/20 outline-none transition-all font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-600 space-y-1 leading-relaxed">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Family Companion Protection Active</span>
+                </div>
+                <p className="text-[10px] text-slate-500">
+                  By linking this PayPal wallet, purchase requests will be evaluated in real time against your family guardrails before fund capture.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={paypalConnecting || !paypalAuthEmail.trim()}
+                onClick={() => {
+                  setPaypalConnecting(true);
+                  setTimeout(() => {
+                    const accId = `PP-WAL-${Math.floor(100000 + Math.random() * 900000)}`;
+                    setPaypalEmail(paypalAuthEmail.trim());
+                    setPaypalAccountId(accId);
+                    setPaypalConnected(true);
+                    setPaypalConnecting(false);
+                    setIsPaypalModalOpen(false);
+                  }, 800);
+                }}
+                className="w-full py-2.5 rounded-full bg-[#0070ba] hover:bg-[#005ea6] text-white text-xs font-bold transition-all shadow-md shadow-[#0070ba]/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {paypalConnecting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Authorizing with PayPal...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Agree &amp; Link PayPal Account</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

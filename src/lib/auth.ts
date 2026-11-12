@@ -161,6 +161,9 @@ export async function getSessionUser(req?: NextRequest): Promise<SessionUser | n
         emergencyContactName: true,
         emergencyContactPhone: true,
         preferredNotification: true,
+        paypalEmail: true,
+        paypalAccountId: true,
+        paypalConnectedAt: true,
         roleDefault: true,
         isSynthetic: true,
         isActive: true,
@@ -182,6 +185,9 @@ export async function getSessionUser(req?: NextRequest): Promise<SessionUser | n
       emergencyContactName: user.emergencyContactName,
       emergencyContactPhone: user.emergencyContactPhone,
       preferredNotification: user.preferredNotification,
+      paypalEmail: user.paypalEmail,
+      paypalAccountId: user.paypalAccountId,
+      paypalConnectedAt: user.paypalConnectedAt ? user.paypalConnectedAt.toISOString() : null,
     };
   } catch {
     return null;

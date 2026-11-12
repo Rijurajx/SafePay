@@ -167,6 +167,8 @@ export async function GET(req: NextRequest) {
             emergencyContactName: l.elder.emergencyContactName,
             emergencyContactPhone: l.elder.emergencyContactPhone,
             relationship: l.relationship,
+            paypalEmail: l.elder.paypalEmail,
+            paypalAccountId: l.elder.paypalAccountId,
             permission: {
               canView: l.permission?.canViewTransactions ?? true,
               canApprove: l.permission?.canApprovePayments ?? false,

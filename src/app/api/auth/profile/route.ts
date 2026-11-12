@@ -22,6 +22,9 @@ export async function PATCH(req: NextRequest) {
       emergencyContactName,
       emergencyContactPhone,
       dateOfBirth,
+      paypalEmail,
+      paypalAccountId,
+      disconnectPaypal,
     } = body;
 
     const dataToUpdate: Prisma.UserUpdateInput & {
@@ -32,6 +35,9 @@ export async function PATCH(req: NextRequest) {
       emergencyContactName?: string | null;
       emergencyContactPhone?: string | null;
       dateOfBirth?: string | null;
+      paypalEmail?: string | null;
+      paypalAccountId?: string | null;
+      paypalConnectedAt?: Date | null;
     } = {};
 
     if (fullName !== undefined) {
@@ -71,6 +77,24 @@ export async function PATCH(req: NextRequest) {
       dataToUpdate.dateOfBirth = dateOfBirth ? String(dateOfBirth).trim() : null;
     }
 
+    if (disconnectPaypal) {
+      dataToUpdate.paypalEmail = null;
+      dataToUpdate.paypalAccountId = null;
+      dataToUpdate.paypalConnectedAt = null;
+    } else if (paypalEmail !== undefined) {
+      if (paypalEmail && String(paypalEmail).trim()) {
+        dataToUpdate.paypalEmail = String(paypalEmail).trim();
+        dataToUpdate.paypalAccountId = paypalAccountId
+          ? String(paypalAccountId).trim()
+          : `PP-WAL-${Math.floor(100000 + Math.random() * 900000)}`;
+        dataToUpdate.paypalConnectedAt = new Date();
+      } else {
+        dataToUpdate.paypalEmail = null;
+        dataToUpdate.paypalAccountId = null;
+        dataToUpdate.paypalConnectedAt = null;
+      }
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: session.id },
       data: dataToUpdate as Prisma.UserUpdateInput,
@@ -85,11 +109,37 @@ export async function PATCH(req: NextRequest) {
         emergencyContactName: true,
         emergencyContactPhone: true,
         preferredNotification: true,
+        paypalEmail: true,
+        paypalAccountId: true,
+        paypalConnectedAt: true,
         roleDefault: true,
         isSynthetic: true,
         isActive: true,
       },
     });
+
+    // If caregiver connected/updated PayPal, also sync to their linked active elders for purchases
+    if (paypalEmail !== undefined || disconnectPaypal) {
+      try {
+        const elderLinks = await prisma.familyLink.findMany({
+          where: { caregiverId: session.id, status: 'ACTIVE' },
+          select: { elderId: true },
+        });
+
+        for (const link of elderLinks) {
+          await prisma.user.update({
+            where: { id: link.elderId },
+            data: {
+              paypalEmail: disconnectPaypal ? null : dataToUpdate.paypalEmail,
+              paypalAccountId: disconnectPaypal ? null : dataToUpdate.paypalAccountId,
+              paypalConnectedAt: disconnectPaypal ? null : dataToUpdate.paypalConnectedAt,
+            },
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to sync PayPal account to elder users:', err);
+      }
+    }
 
     // Audit event
     try {

@@ -112,6 +112,9 @@ model User {
   emergencyContactName  String?
   emergencyContactPhone String?
   preferredNotification String?  @default("BOTH")
+  paypalEmail           String?
+  paypalAccountId       String?
+  paypalConnectedAt     DateTime? @db.Timestamptz
   roleDefault           Role     @default(PROTECTED_USER)
   isSynthetic           Boolean  @default(false)
   isActive              Boolean  @default(true)
