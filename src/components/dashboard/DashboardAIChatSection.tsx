@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
-  Sparkles,
   Send,
   Copy,
   Check,
@@ -10,6 +9,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { SessionUser } from '@/types';
+import { LunaMascot } from '@/components/mascot/LunaMascot';
 
 interface ChatMessage {
   id: string;
@@ -53,7 +53,7 @@ export function DashboardAIChatSection({
       return {
         id: 'welcome-no-elder',
         role: 'assistant',
-        content: `Hello ${currentUser?.fullName || 'Caregiver'}! I am your **SafePay AI Assistant**.\n\nYou have not connected a senior family member yet. Once you send an invitation and your senior member connects, I will automatically monitor their transactions, evaluate anomalies in real time, and explain high-risk holds for you here.\n\nClick **"Invite Senior Member"** above to connect your loved one.`,
+        content: `Hello ${currentUser?.fullName || 'Caregiver'}! I am **Luna AI**, your dedicated family protection companion.\n\nYou have not connected a senior family member yet. Once you send an invitation and your senior member connects, I will automatically monitor their transactions, evaluate anomalies in real time, and explain high-risk holds for you here.\n\nClick **"Invite Senior Member"** above to connect your loved one.`,
         suggestedActions: [
           'How does SafePay protect my elderly family member?',
           'What happens when an unusual charge occurs?',
@@ -67,7 +67,7 @@ export function DashboardAIChatSection({
       return {
         id: `welcome-${elderId || 'default'}-${latestHold.id}`,
         role: 'assistant',
-        content: `Hello ${currentUser?.fullName || 'Maya'}! I am your **SafePay AI Assistant** with live RAG access to **${elderName}**'s payment baseline and active holds.\n\n⚠️ **Active Pending Hold:** SafePay is holding a **$${latestHold.amount.toFixed(2)} ${latestHold.currency}** charge from **${latestHold.merchantName}** (${latestHold.category}, Risk Score: ${latestHold.riskScore}/100) awaiting your review.\n\nAsk me about the risk assessment, why this charge was held, or ask me to draft a gentle text to ${elderName}.`,
+        content: `Hello ${currentUser?.fullName || 'Maya'}! I am **Luna AI** with live RAG access to **${elderName}**'s payment baseline and active holds.\n\n⚠️ **Active Pending Hold:** SafePay is holding a **$${latestHold.amount.toFixed(2)} ${latestHold.currency}** charge from **${latestHold.merchantName}** (${latestHold.category}, Risk Score: ${latestHold.riskScore}/100) awaiting your review.\n\nAsk me about the risk assessment, why this charge was held, or ask me to draft a gentle text to ${elderName}.`,
         suggestedActions: [
           `Why was the $${latestHold.amount.toFixed(0)} charge from ${latestHold.merchantName} held?`,
           `Draft a gentle text to ${elderName} about ${latestHold.merchantName}`,
@@ -80,7 +80,7 @@ export function DashboardAIChatSection({
     return {
       id: `welcome-${elderId || 'default'}`,
       role: 'assistant',
-      content: `Hello ${currentUser?.fullName || 'Maya'}! I am your **SafePay AI Assistant** with real-time access to **${elderName}**'s payment baseline, daily cap utilization, and transaction records.\n\nAsk me about recent transactions, protection limits, or ask me to draft a gentle check-in note to ${elderName}.`,
+      content: `Hello ${currentUser?.fullName || 'Maya'}! I am **Luna AI** with real-time access to **${elderName}**'s payment baseline, daily cap utilization, and transaction records.\n\nAsk me about recent transactions, protection limits, or ask me to draft a gentle check-in note to ${elderName}.`,
       suggestedActions: [
         `Summarize ${elderName}'s recent spending`,
         `Who are ${elderName}'s saved merchants?`,
@@ -200,9 +200,9 @@ export function DashboardAIChatSection({
         </div>
 
         <div className="flex items-center gap-2">
-          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+          <LunaMascot size="xs" />
           <span className="text-xs font-bold text-slate-950 tracking-tight">
-            SafePay Account RAG Assistant
+            Luna AI
           </span>
           <span className="text-[11px] font-semibold text-slate-400">•</span>
           <span className="text-[11px] text-slate-600 font-semibold">Account: {elderName}</span>
@@ -261,71 +261,81 @@ export function DashboardAIChatSection({
               {m.role === 'user' ? (
                 <span>You • {m.timestamp}</span>
               ) : (
-                <span className="flex items-center gap-1 text-purple-700 font-semibold">
-                  <Sparkles className="w-3 h-3" /> SafePay AI • {m.timestamp}
+                <span className="flex items-center gap-1.5 text-purple-700 font-semibold">
+                  <LunaMascot size="xs" /> Luna AI • {m.timestamp}
                 </span>
               )}
             </div>
 
             <div
-              className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 text-xs sm:text-sm leading-relaxed shadow-xs ${
-                m.role === 'user'
-                  ? 'bg-slate-950 text-white rounded-br-xs'
-                  : 'bg-white/95 text-slate-900 border border-black/5 rounded-bl-xs'
+              className={`flex items-start gap-2 max-w-[85%] sm:max-w-[75%] ${
+                m.role === 'user' ? 'justify-end' : 'justify-start'
               }`}
             >
-              <div className="whitespace-pre-line">{m.content}</div>
+              {m.role === 'assistant' && (
+                <LunaMascot size="xs" className="mt-1 shrink-0" />
+              )}
+              <div
+                className={`w-full rounded-2xl p-4 text-xs sm:text-sm leading-relaxed shadow-xs ${
+                  m.role === 'user'
+                    ? 'bg-slate-950 text-white rounded-br-xs'
+                    : 'bg-white/95 text-slate-900 border border-black/5 rounded-bl-xs'
+                }`}
+              >
+                <div className="whitespace-pre-line">{m.content}</div>
 
-              {/* Draft text for Senior if present */}
-              {m.draftMessage && (
-                <div className="mt-3 p-3 rounded-xl bg-purple-50/80 border border-purple-200/80 text-purple-950 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-purple-800">
-                      Suggested Text Message to {elderName}:
-                    </span>
-                    <button
-                      onClick={() => handleCopyDraft(m.id, m.draftMessage!)}
-                      className="px-2 py-1 rounded-md bg-white text-purple-900 text-[11px] font-semibold hover:bg-purple-100 transition-colors flex items-center gap-1 shadow-2xs"
-                    >
-                      {copiedDraftId === m.id ? (
-                        <>
-                          <Check className="w-3 h-3 text-emerald-600" />
-                          <span>Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3 h-3" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
+                {/* Draft text for Senior if present */}
+                {m.draftMessage && (
+                  <div className="mt-3 p-3 rounded-xl bg-purple-50/80 border border-purple-200/80 text-purple-950 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-purple-800">
+                        Suggested Text Message to {elderName}:
+                      </span>
+                      <button
+                        onClick={() => handleCopyDraft(m.id, m.draftMessage!)}
+                        className="px-2 py-1 rounded-md bg-white text-purple-900 text-[11px] font-semibold hover:bg-purple-100 transition-colors flex items-center gap-1 shadow-2xs"
+                      >
+                        {copiedDraftId === m.id ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-xs font-medium italic">&ldquo;{m.draftMessage}&rdquo;</p>
                   </div>
-                  <p className="text-xs font-medium italic">&ldquo;{m.draftMessage}&rdquo;</p>
-                </div>
-              )}
+                )}
 
-              {/* Dynamic Suggested Actions */}
-              {m.suggestedActions && m.suggestedActions.length > 0 && (
-                <div className="mt-3 pt-2.5 border-t border-black/5 flex flex-wrap gap-1.5">
-                  {m.suggestedActions.map((action, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleSend(action)}
-                      className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-slate-100 hover:bg-purple-50 hover:text-purple-900 hover:border-purple-200 border border-slate-200/60 text-slate-700 transition-all active:scale-95"
-                    >
-                      {action} &rarr;
-                    </button>
-                  ))}
-                </div>
-              )}
+                {/* Dynamic Suggested Actions */}
+                {m.suggestedActions && m.suggestedActions.length > 0 && (
+                  <div className="mt-3 pt-2.5 border-t border-black/5 flex flex-wrap gap-1.5">
+                    {m.suggestedActions.map((action, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleSend(action)}
+                        className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-slate-100 hover:bg-purple-50 hover:text-purple-900 hover:border-purple-200 border border-slate-200/60 text-slate-700 transition-all active:scale-95"
+                      >
+                        {action} &rarr;
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         ))}
 
         {loading && (
           <div className="flex items-center gap-2 p-3 rounded-2xl bg-white/80 border border-black/5 max-w-xs text-xs text-slate-600 font-medium animate-pulse">
-            <RefreshCw className="w-3.5 h-3.5 text-purple-600 animate-spin" />
-            <span>Consulting {elderName}&apos;s live account RAG...</span>
+            <LunaMascot size="xs" />
+            <RefreshCw className="w-3.5 h-3.5 text-purple-600 animate-spin ml-0.5" />
+            <span>Luna AI is consulting {elderName}&apos;s live account records...</span>
           </div>
         )}
 
