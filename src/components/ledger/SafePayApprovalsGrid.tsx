@@ -57,17 +57,23 @@ interface SafePayApprovalsGridProps {
 }
 
 const approvalsTheme = themeQuartz.withParams({
-  accentColor: '#9333ea',
+  accentColor: '#d97706',
   backgroundColor: '#ffffff',
-  borderColor: '#fef3c7',
+  borderColor: 'rgba(254, 243, 199, 0.8)',
   borderRadius: 16,
+  wrapperBorderRadius: 16,
+  wrapperBorder: false,
+  columnBorder: false,
+  rowBorder: { style: 'solid', width: 1, color: '#fef3c7' },
   headerBackgroundColor: '#fffbeb',
   headerTextColor: '#78350f',
   headerFontWeight: 700,
   headerFontSize: 12,
-  fontSize: 13,
-  rowHoverColor: '#fefce8',
+  headerCellHoverBackgroundColor: '#fef3c7',
+  rowHoverColor: '#fffdf5',
   selectedRowBackgroundColor: '#fef3c7',
+  fontSize: 13,
+  cellHorizontalPadding: 16,
 });
 
 export function SafePayApprovalsGrid({
@@ -98,9 +104,9 @@ export function SafePayApprovalsGrid({
     const data = params.data;
     if (!data) return null;
     return (
-      <div className="flex items-center gap-2 h-full w-full overflow-hidden">
-        <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-bold shrink-0">
-          <User className="w-3.5 h-3.5" />
+      <div className="flex items-center gap-2.5 h-full w-full overflow-hidden py-1">
+        <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold shrink-0">
+          <User className="w-4 h-4" />
         </div>
         <div className="min-w-0 flex-1 overflow-hidden leading-tight">
           <span className="font-bold text-slate-900 text-xs block truncate">{data.elderName}</span>
@@ -115,9 +121,9 @@ export function SafePayApprovalsGrid({
     const data = params.data;
     if (!data) return null;
     return (
-      <div className="flex items-center gap-2 h-full w-full overflow-hidden">
-        <div className="w-6 h-6 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
-          <Store className="w-3.5 h-3.5" />
+      <div className="flex items-center gap-2.5 h-full w-full overflow-hidden py-1">
+        <div className="w-8 h-8 rounded-xl bg-amber-100/70 text-amber-800 flex items-center justify-center shrink-0 border border-amber-200/50">
+          <Store className="w-4 h-4" />
         </div>
         <div className="min-w-0 flex-1 overflow-hidden leading-tight">
           <span className="font-bold text-slate-900 text-xs block truncate">{data.merchantName}</span>
@@ -131,8 +137,8 @@ export function SafePayApprovalsGrid({
   const AmountCellRenderer = (params: ICellRendererParams<SafePayApprovalRow>) => {
     const amt = Number(params.value || 0);
     return (
-      <div className="flex items-center h-full">
-        <span className="font-extrabold text-amber-950 font-mono text-sm">
+      <div className="flex items-center justify-end h-full w-full pr-2">
+        <span className="font-extrabold text-amber-950 font-mono text-sm tracking-tight">
           ${amt.toFixed(2)}
         </span>
       </div>
@@ -144,9 +150,9 @@ export function SafePayApprovalsGrid({
     const score = Number(params.value ?? 50);
     const isHigh = score >= 70;
     return (
-      <div className="flex items-center gap-1.5 h-full">
+      <div className="flex items-center gap-2 h-full">
         <span
-          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
             isHigh ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
           }`}
         >
@@ -167,19 +173,19 @@ export function SafePayApprovalsGrid({
     const isThisDeciding = decidingId === data.id;
 
     return (
-      <div className="flex items-center gap-1.5 h-full py-1">
+      <div className="flex items-center gap-2 h-full py-1">
         <button
           onClick={(e) => {
             e.stopPropagation();
             onDecide(data.id, 'APPROVE');
           }}
           disabled={isThisDeciding}
-          className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-2xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-2xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
         >
           {isThisDeciding ? (
             <RefreshCw className="w-3 h-3 animate-spin" />
           ) : (
-            <CheckCircle2 className="w-3 h-3" />
+            <CheckCircle2 className="w-3.5 h-3.5" />
           )}
           <span>Approve</span>
         </button>
@@ -190,9 +196,9 @@ export function SafePayApprovalsGrid({
             onDecide(data.id, 'DECLINE');
           }}
           disabled={isThisDeciding}
-          className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+          className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
         >
-          <XCircle className="w-3 h-3" />
+          <XCircle className="w-3.5 h-3.5" />
           <span>Decline</span>
         </button>
       </div>
@@ -231,6 +237,7 @@ export function SafePayApprovalsGrid({
         flex: 1,
         minWidth: 110,
         sort: 'desc',
+        headerClass: 'text-right',
       },
       {
         headerName: 'Risk Evaluation',
@@ -295,7 +302,7 @@ export function SafePayApprovalsGrid({
                 if (gridApi) gridApi.setGridOption('quickFilterText', e.target.value);
               }}
               placeholder="Search approvals..."
-              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white border border-amber-200 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-amber-500/20"
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white border border-amber-200 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-amber-500/20 shadow-2xs"
             />
           </div>
 
@@ -310,9 +317,10 @@ export function SafePayApprovalsGrid({
         </div>
       </div>
 
+      {/* The AG Grid Table (No legacy ag-theme class to prevent error 106) */}
       <div
-        className="ag-theme-quartz w-full rounded-2xl overflow-hidden border border-amber-200/90 shadow-xs bg-white"
-        style={{ height: rowData.length <= 4 ? `${Math.max(220, rowData.length * 62 + 90)}px` : '360px' }}
+        className="w-full rounded-2xl overflow-hidden border border-amber-200/90 shadow-xs bg-white"
+        style={{ height: rowData.length <= 4 ? `${Math.max(220, rowData.length * 64 + 90)}px` : '360px' }}
       >
         <AgGridReact<SafePayApprovalRow>
           ref={gridRef}
@@ -320,8 +328,8 @@ export function SafePayApprovalsGrid({
           rowData={rowData}
           columnDefs={columnDefs}
           defaultColDef={defaultColDef}
-          rowHeight={56}
-          headerHeight={44}
+          rowHeight={60}
+          headerHeight={46}
           pagination={rowData.length > 5}
           paginationPageSize={5}
           rowSelection={{ mode: 'singleRow' }}

@@ -45,19 +45,26 @@ interface SafePayLedgerGridProps {
   title?: string;
 }
 
-// Clean custom Quartz theme styled to match SafePay design
+// Polished custom Quartz theme matching SafePay's modern design
 const safePayGridTheme = themeQuartz.withParams({
   accentColor: '#9333ea',
   backgroundColor: '#ffffff',
-  borderColor: '#e2e8f0',
+  borderColor: 'rgba(226, 232, 240, 0.7)',
   borderRadius: 16,
-  headerBackgroundColor: '#f8fafc',
-  headerTextColor: '#0f172a',
+  wrapperBorderRadius: 16,
+  wrapperBorder: false,
+  columnBorder: false,
+  rowBorder: { style: 'solid', width: 1, color: '#f1f5f9' },
+  headerBackgroundColor: '#faf5ff',
+  headerTextColor: '#3b0764',
   headerFontWeight: 700,
   headerFontSize: 12,
-  fontSize: 13,
-  rowHoverColor: '#faf5ff',
+  headerCellHoverBackgroundColor: '#f3e8ff',
+  rowHoverColor: '#faf8ff',
   selectedRowBackgroundColor: '#f5f3ff',
+  oddRowBackgroundColor: '#ffffff',
+  fontSize: 13,
+  cellHorizontalPadding: 16,
 });
 
 export function SafePayLedgerGrid({
@@ -90,8 +97,8 @@ export function SafePayLedgerGrid({
     if (['SETTLED', 'APPROVED', 'APPROVED_FOR_CHECKOUT', 'READY_FOR_CHECKOUT'].includes(status)) {
       return (
         <div className="flex items-center h-full">
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
             <span>Settled</span>
           </span>
         </div>
@@ -100,8 +107,8 @@ export function SafePayLedgerGrid({
     if (['AWAITING_FAMILY', 'WAITING', 'CAPTURE_PENDING', 'CHECKOUT_IN_PROGRESS'].includes(status)) {
       return (
         <div className="flex items-center h-full">
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
-            <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80 animate-pulse">
+            <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
             <span>Held for Review</span>
           </span>
         </div>
@@ -109,8 +116,8 @@ export function SafePayLedgerGrid({
     }
     return (
       <div className="flex items-center h-full">
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-          <XCircle className="w-3 h-3 text-rose-600 shrink-0" />
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/80">
+          <XCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
           <span>Declined</span>
         </span>
       </div>
@@ -122,9 +129,9 @@ export function SafePayLedgerGrid({
     const data = params.data;
     if (!data) return null;
     return (
-      <div className="flex items-center gap-2.5 h-full w-full overflow-hidden py-1">
-        <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold">
-          <Store className="w-3.5 h-3.5" />
+      <div className="flex items-center gap-3 h-full w-full overflow-hidden py-1">
+        <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center shrink-0 border border-purple-100/80">
+          <Store className="w-4 h-4 text-purple-600" />
         </div>
         <div className="min-w-0 flex-1 overflow-hidden leading-tight">
           <div className="flex items-center gap-1.5">
@@ -148,9 +155,9 @@ export function SafePayLedgerGrid({
     const isMed = score >= 40 && score < 70;
 
     return (
-      <div className="flex items-center gap-1.5 h-full">
+      <div className="flex items-center gap-2 h-full">
         <span
-          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${
+          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-bold ${
             isHigh
               ? 'bg-rose-100 text-rose-800'
               : isMed
@@ -166,7 +173,7 @@ export function SafePayLedgerGrid({
           <span>{score}/100</span>
         </span>
         <span className="text-[10px] text-slate-400 hidden sm:inline">
-          {isHigh ? 'High' : isMed ? 'Review' : 'Safe'}
+          {isHigh ? 'High Risk' : isMed ? 'Review' : 'Safe'}
         </span>
       </div>
     );
@@ -176,8 +183,8 @@ export function SafePayLedgerGrid({
   const AmountCellRenderer = (params: ICellRendererParams<SafePayGridRow>) => {
     const amt = Number(params.value || 0);
     return (
-      <div className="flex items-center h-full">
-        <span className="font-extrabold text-slate-900 font-mono text-sm">
+      <div className="flex items-center justify-end h-full w-full pr-2">
+        <span className="font-extrabold text-slate-950 font-mono text-sm tracking-tight">
           ${amt.toFixed(2)}
         </span>
       </div>
@@ -190,7 +197,7 @@ export function SafePayLedgerGrid({
     const d = new Date(params.value);
     return (
       <div className="flex flex-col justify-center h-full text-xs text-slate-600 leading-tight">
-        <div className="font-medium text-slate-800">{d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+        <div className="font-semibold text-slate-800">{d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</div>
         <div className="text-[10px] text-slate-400 mt-0.5">
           {d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
@@ -225,6 +232,7 @@ export function SafePayLedgerGrid({
         minWidth: 110,
         sort: 'desc',
         filter: 'agNumberColumnFilter',
+        headerClass: 'text-right',
       },
       {
         headerName: 'Status',
@@ -257,7 +265,7 @@ export function SafePayLedgerGrid({
         minWidth: 130,
         cellRenderer: (params: ICellRendererParams) => (
           <div className="flex items-center h-full w-full overflow-hidden">
-            <span className="font-mono text-[11px] text-slate-500 truncate block">
+            <span className="font-mono text-[11px] text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100 truncate">
               {params.value}
             </span>
           </div>
@@ -292,7 +300,7 @@ export function SafePayLedgerGrid({
             <h3 className="text-sm font-bold text-slate-900">{title}</h3>
           )}
           {/* Status Filter Badges */}
-          <div className="flex flex-wrap items-center gap-1 p-0.5 bg-slate-100 rounded-xl border border-slate-200/80 text-xs">
+          <div className="flex flex-wrap items-center gap-1 p-0.5 bg-slate-100/80 rounded-xl border border-slate-200/70 text-xs">
             <button
               onClick={() => setStatusFilter('ALL')}
               className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
@@ -348,7 +356,7 @@ export function SafePayLedgerGrid({
                 if (gridApi) gridApi.setGridOption('quickFilterText', e.target.value);
               }}
               placeholder="Search table..."
-              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-purple-600/20"
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-purple-600/20 shadow-2xs"
             />
           </div>
 
@@ -364,10 +372,10 @@ export function SafePayLedgerGrid({
         </div>
       </div>
 
-      {/* The AG Grid Table */}
+      {/* The AG Grid Table (No legacy ag-theme class to prevent error 106) */}
       <div
-        className="ag-theme-quartz w-full rounded-2xl overflow-hidden border border-slate-200/90 shadow-xs bg-white"
-        style={{ height: '460px' }}
+        className="w-full rounded-2xl overflow-hidden border border-slate-200/80 shadow-xs bg-white"
+        style={{ height: '480px' }}
       >
         <AgGridReact<SafePayGridRow>
           ref={gridRef}
@@ -375,8 +383,8 @@ export function SafePayLedgerGrid({
           rowData={filteredData}
           columnDefs={columnDefs}
           defaultColDef={defaultColDef}
-          rowHeight={56}
-          headerHeight={44}
+          rowHeight={60}
+          headerHeight={46}
           pagination={true}
           paginationPageSize={10}
           paginationPageSizeSelector={[10, 25, 50, 100]}
@@ -385,9 +393,9 @@ export function SafePayLedgerGrid({
           onGridReady={onGridReady}
           loading={loading}
           overlayNoRowsTemplate={`
-            <div style="padding: 24px; text-align: center; color: #64748b; font-size: 13px;">
-              <div style="font-weight: 600; margin-bottom: 4px;">No matching transactions</div>
-              <div style="font-size: 11px;">Adjust search keywords or filter status above.</div>
+            <div style="padding: 32px; text-align: center; color: #64748b; font-size: 13px;">
+              <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;">No matching transactions</div>
+              <div style="font-size: 11px;">Adjust your search keyword or status filter.</div>
             </div>
           `}
         />
@@ -397,7 +405,7 @@ export function SafePayLedgerGrid({
       <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
         <span className="flex items-center gap-1.5">
           <FileSpreadsheet className="w-3.5 h-3.5 text-purple-600" />
-          <span>Showing <strong>{filteredData.length}</strong> of <strong>{rowData.length}</strong> transactions</span>
+          <span>Showing <strong>{filteredData.length}</strong> of <strong>{rowData.length}</strong> records</span>
         </span>
         <span className="hidden sm:inline text-slate-400">
           Click column headers to sort &bull; Drag to reorder columns
