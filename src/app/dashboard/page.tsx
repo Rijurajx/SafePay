@@ -343,7 +343,7 @@ export default function DashboardPage() {
   const [isCustomCheckoutOpen, setIsCustomCheckoutOpen] = useState(false);
 
   // Custom demo checkout states
-  const [customMerchant, setCustomMerchant] = useState('Whole Foods Market');
+  const [customMerchant, setCustomMerchant] = useState('Fresh Organic Grocers');
   const [customAmount, setCustomAmount] = useState('64.50');
   const [customCategory, setCustomCategory] = useState('Groceries');
   const [customNote, setCustomNote] = useState('Weekly grocery shopping');
@@ -1007,6 +1007,89 @@ export default function DashboardPage() {
     ).length;
   }, [seniorRecentPayments]);
 
+  // Dynamically evaluate predicted routing/outcome based on live threshold, spending caps, and guardian
+  const getScenarioPrediction = useCallback(
+    (amount: number, category: string) => {
+      const primaryCaregiver = seniorGuardians[0]?.fullName?.split(' ')[0] || 'Caregiver';
+      const remainingDaily =
+        seniorRemainingDailyCap !== undefined
+          ? seniorRemainingDailyCap
+          : Math.max(0, seniorDailyCap - seniorTodaySpend);
+      const remainingMonthly =
+        seniorRemainingMonthlyBudget !== undefined
+          ? seniorRemainingMonthlyBudget
+          : Math.max(0, seniorMonthlyBudget - seniorMonthSpend);
+
+      // 1. High-risk category policy rule
+      if (category.toLowerCase().includes('crypto') || category.toLowerCase().includes('wire')) {
+        return {
+          tag: 'Policy Review',
+          badgeClass: 'text-rose-700 bg-rose-50 border border-rose-200/60',
+          cardBorder: 'border-rose-200/80',
+          iconHover: 'group-hover:text-rose-600',
+          priceColor: 'text-rose-950',
+          subtext: 'High-risk category · Flagged for safety review',
+        };
+      }
+
+      // 2. Exceeds remaining daily spending cap
+      if (amount > remainingDaily) {
+        return {
+          tag: 'Cap Exceeded',
+          badgeClass: 'text-amber-800 bg-amber-50 border border-amber-200/60',
+          cardBorder: 'border-amber-200/80',
+          iconHover: 'group-hover:text-amber-600',
+          priceColor: 'text-amber-950',
+          subtext: `Exceeds $${Math.max(0, remainingDaily).toFixed(0)} remaining daily cap · Needs ${primaryCaregiver}`,
+        };
+      }
+
+      // 3. Exceeds remaining monthly budget
+      if (amount > remainingMonthly) {
+        return {
+          tag: 'Budget Exceeded',
+          badgeClass: 'text-amber-800 bg-amber-50 border border-amber-200/60',
+          cardBorder: 'border-amber-200/80',
+          iconHover: 'group-hover:text-amber-600',
+          priceColor: 'text-amber-950',
+          subtext: `Exceeds $${Math.max(0, remainingMonthly).toFixed(0)} monthly budget · Needs ${primaryCaregiver}`,
+        };
+      }
+
+      // 4. Exceeds single-transaction family approval threshold
+      if (amount > seniorFamilyThreshold) {
+        return {
+          tag: 'Family Review',
+          badgeClass: 'text-amber-800 bg-amber-50 border border-amber-200/60',
+          cardBorder: 'border-amber-200/80',
+          iconHover: 'group-hover:text-amber-600',
+          priceColor: 'text-amber-950',
+          subtext: `Exceeds $${seniorFamilyThreshold.toFixed(0)} threshold · Holds for ${primaryCaregiver}`,
+        };
+      }
+
+      // 5. Within all safety caps & auto-approval threshold
+      return {
+        tag: 'Auto-Approve',
+        badgeClass: 'text-emerald-700 bg-emerald-50 border border-emerald-200/60',
+        cardBorder: 'border-slate-200/80',
+        iconHover: 'group-hover:text-slate-900',
+        priceColor: 'text-slate-950',
+        subtext: `Within $${seniorFamilyThreshold.toFixed(0)} threshold & $${Math.max(0, remainingDaily).toFixed(0)} daily cap`,
+      };
+    },
+    [
+      seniorGuardians,
+      seniorRemainingDailyCap,
+      seniorDailyCap,
+      seniorTodaySpend,
+      seniorRemainingMonthlyBudget,
+      seniorMonthlyBudget,
+      seniorMonthSpend,
+      seniorFamilyThreshold,
+    ]
+  );
+
   const handleRunDemoSimulation = async (params: {
     merchantName: string;
     amount: number;
@@ -1648,103 +1731,69 @@ export default function DashboardPage() {
                   </button>
                 </div>
 
-                {/* 1-Click Sandbox Test Scenarios */}
+                {/* 1-Click Sandbox Test Scenarios (Dynamic evaluation based on live threshold & remaining caps) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
-                  {/* Scenario 1: Routine Pharmacy */}
-                  <button
-                    disabled={customSimulating}
-                    onClick={() =>
-                      handleRunDemoSimulation({
-                        merchantName: 'Local Care Pharmacy',
-                        amount: 32.50,
-                        category: 'Pharmacy & Health',
-                        autoSettle: true,
-                      })
-                    }
-                    className="p-3.5 bg-white/80 hover:bg-white rounded-2xl border border-slate-200/80 text-left transition-all active:scale-[0.98] shadow-2xs space-y-1.5 group cursor-pointer"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                        Routine Auto
-                      </span>
-                      <Play className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-900 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <div className="text-xs font-bold text-slate-900">Local Care Pharmacy</div>
-                    <div className="text-sm font-extrabold text-slate-950">$32.50</div>
-                    <p className="text-[10px] text-slate-500">Auto-approved routine medication refill</p>
-                  </button>
-
-                  {/* Scenario 2: Routine Online */}
-                  <button
-                    disabled={customSimulating}
-                    onClick={() =>
-                      handleRunDemoSimulation({
-                        merchantName: 'Amazon Home & Gardening',
-                        amount: 45.99,
-                        category: 'Home & Garden',
-                        autoSettle: true,
-                      })
-                    }
-                    className="p-3.5 bg-white/80 hover:bg-white rounded-2xl border border-slate-200/80 text-left transition-all active:scale-[0.98] shadow-2xs space-y-1.5 group cursor-pointer"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                        Routine Auto
-                      </span>
-                      <Play className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-900 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <div className="text-xs font-bold text-slate-900">Amazon Gardening Set</div>
-                    <div className="text-sm font-extrabold text-slate-950">$45.99</div>
-                    <p className="text-[10px] text-slate-500">Under $100 family threshold</p>
-                  </button>
-
-                  {/* Scenario 3: Threshold Exceeded */}
-                  <button
-                    disabled={customSimulating}
-                    onClick={() =>
-                      handleRunDemoSimulation({
-                        merchantName: 'BestBuy Electronics Store',
-                        amount: 450.00,
-                        category: 'Electronics',
-                        autoSettle: true,
-                      })
-                    }
-                    className="p-3.5 bg-white/80 hover:bg-white rounded-2xl border border-amber-200/80 text-left transition-all active:scale-[0.98] shadow-2xs space-y-1.5 group cursor-pointer"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
-                        Family Hold
-                      </span>
-                      <Play className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <div className="text-xs font-bold text-slate-900">BestBuy Electronics</div>
-                    <div className="text-sm font-extrabold text-amber-900">$450.00</div>
-                    <p className="text-[10px] text-slate-500">Exceeds $100 threshold &rarr; holds for Maya</p>
-                  </button>
-
-                  {/* Scenario 4: Crypto / Policy Warning */}
-                  <button
-                    disabled={customSimulating}
-                    onClick={() =>
-                      handleRunDemoSimulation({
-                        merchantName: 'Crypto Wire Global',
-                        amount: 1200.00,
-                        category: 'Wire / Crypto',
-                        autoSettle: true,
-                      })
-                    }
-                    className="p-3.5 bg-white/80 hover:bg-white rounded-2xl border border-rose-200/80 text-left transition-all active:scale-[0.98] shadow-2xs space-y-1.5 group cursor-pointer"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full">
-                        High Risk
-                      </span>
-                      <Play className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-600 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <div className="text-xs font-bold text-slate-900">Crypto Wire Global</div>
-                    <div className="text-sm font-extrabold text-rose-900">$1,200.00</div>
-                    <p className="text-[10px] text-slate-500">Unusual high-risk merchant blocked</p>
-                  </button>
+                  {[
+                    {
+                      merchantName: 'Local Care Pharmacy',
+                      displayName: 'Local Care Pharmacy',
+                      amount: 32.50,
+                      category: 'Pharmacy & Health',
+                    },
+                    {
+                      merchantName: 'Home Essentials & Garden',
+                      displayName: 'Home Essentials & Garden',
+                      amount: 45.99,
+                      category: 'Home & Garden',
+                    },
+                    {
+                      merchantName: 'Metro Electronics & Tech',
+                      displayName: 'Metro Electronics & Tech',
+                      amount: 450.00,
+                      category: 'Electronics',
+                    },
+                    {
+                      merchantName: 'Overseas Digital Wire',
+                      displayName: 'Overseas Digital Wire',
+                      amount: 1200.00,
+                      category: 'Wire / Crypto',
+                    },
+                  ].map((scenario) => {
+                    const pred = getScenarioPrediction(scenario.amount, scenario.category);
+                    return (
+                      <button
+                        key={scenario.merchantName}
+                        disabled={customSimulating}
+                        onClick={() =>
+                          handleRunDemoSimulation({
+                            merchantName: scenario.merchantName,
+                            amount: scenario.amount,
+                            category: scenario.category,
+                            autoSettle: true,
+                          })
+                        }
+                        className={`p-3.5 bg-white/80 hover:bg-white rounded-2xl border ${pred.cardBorder} text-left transition-all active:scale-[0.98] shadow-2xs space-y-1.5 group cursor-pointer`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${pred.badgeClass}`}
+                          >
+                            {pred.tag}
+                          </span>
+                          <Play
+                            className={`w-3.5 h-3.5 text-slate-400 ${pred.iconHover} group-hover:translate-x-0.5 transition-transform`}
+                          />
+                        </div>
+                        <div className="text-xs font-bold text-slate-900 truncate">
+                          {scenario.displayName}
+                        </div>
+                        <div className={`text-sm font-extrabold ${pred.priceColor}`}>
+                          ${scenario.amount.toFixed(2)}
+                        </div>
+                        <p className="text-[10px] text-slate-500 leading-snug">{pred.subtext}</p>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {customSimulating && (
@@ -2061,7 +2110,7 @@ export default function DashboardPage() {
                         required
                         value={customMerchant}
                         onChange={(e) => setCustomMerchant(e.target.value)}
-                        placeholder="e.g., Whole Foods, BestBuy, Pharmacy"
+                        placeholder="e.g., Fresh Organic Grocers, Corner Pharmacy, Tech Hub"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
                     </div>
@@ -2126,6 +2175,23 @@ export default function DashboardPage() {
                         className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500"
                       />
                     </div>
+
+                    {/* Live Dynamic Safeguard Preview */}
+                    {(() => {
+                      const numAmt = Number(customAmount) || 0;
+                      const pred = getScenarioPrediction(numAmt, customCategory);
+                      return (
+                        <div className={`p-3 rounded-xl border ${pred.cardBorder} bg-slate-50/80 text-xs flex items-center justify-between gap-3`}>
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Live Protection Routing</span>
+                            <span className="text-xs font-semibold text-slate-800 truncate block mt-0.5">{pred.subtext}</span>
+                          </div>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full shrink-0 ${pred.badgeClass}`}>
+                            {pred.tag}
+                          </span>
+                        </div>
+                      );
+                    })()}
 
                     <div className="flex items-center gap-2 pt-2">
                       <button
