@@ -48,8 +48,11 @@ export async function POST(
       return NextResponse.json({ error: 'Malformed limit request data' }, { status: 400 });
     }
 
-    // 2. Authorize that this caregiver is permitted to manage settings for this elder
-    const authResult = await authorizeCaregiverForElder(session.id, elderId, 'manage');
+    // 2. Authorize that this caregiver is permitted to manage settings or approve payments for this elder
+    let authResult = await authorizeCaregiverForElder(session.id, elderId, 'manage');
+    if (!authResult.authorized) {
+      authResult = await authorizeCaregiverForElder(session.id, elderId, 'approve');
+    }
     if (!authResult.authorized) {
       return NextResponse.json(
         { error: authResult.reason || 'Caregiver does not have permission to manage protection settings' },

@@ -24,29 +24,96 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'A positive requested amount is required' }, { status: 400 });
     }
 
+    // 1. Identify if current user is an Elder (protected user) or Caregiver
+    const isLinkedAsElder = await prisma.familyLink.findFirst({
+      where: { elderId: session.id, status: 'ACTIVE' },
+    });
+    const hasCaregiverLinks = await prisma.familyLink.findFirst({
+      where: { caregiverId: session.id, status: 'ACTIVE' },
+    });
+
+    const isElder = session.roleDefault === Role.PROTECTED_USER || (!!isLinkedAsElder && !hasCaregiverLinks);
+
     let targetElderId = session.id;
     let elderName = session.fullName;
 
-    // If a caregiver is submitting on behalf of an elder, ensure active link
-    if (session.roleDefault === Role.CAREGIVER) {
-      const { elderId } = body;
+    if (isElder) {
+      // User is the senior member making their own limit request
+      targetElderId = session.id;
+      elderName = session.fullName;
+
+      // Auto-heal session user role in database if out-of-sync
+      if (session.roleDefault !== Role.PROTECTED_USER) {
+        try {
+          await prisma.user.update({
+            where: { id: session.id },
+            data: { roleDefault: Role.PROTECTED_USER },
+          });
+        } catch (err) {
+          console.warn('Auto-heal elder role warning:', err);
+        }
+      }
+    } else {
+      // User is a Caregiver submitting or testing a limit request for an elder
+      let elderId = body.elderId;
+
+      // If elderId was not explicitly passed, auto-resolve first active linked elder for this caregiver
       if (!elderId) {
-        return NextResponse.json({ error: 'elderId is required for caregiver requests' }, { status: 400 });
+        const firstLink = await prisma.familyLink.findFirst({
+          where: { caregiverId: session.id, status: 'ACTIVE' },
+          include: { elder: true },
+        });
+
+        if (firstLink) {
+          elderId = firstLink.elderId;
+          elderName = firstLink.elder.fullName;
+        } else {
+          return NextResponse.json(
+            { error: 'No active senior family member found linked to your account' },
+            { status: 400 }
+          );
+        }
+      } else {
+        const link = await prisma.familyLink.findFirst({
+          where: { caregiverId: session.id, elderId, status: 'ACTIVE' },
+          include: { elder: true },
+        });
+
+        if (!link) {
+          return NextResponse.json(
+            { error: 'No active family link found for this senior member' },
+            { status: 403 }
+          );
+        }
+        elderName = link.elder.fullName;
       }
-      const link = await prisma.familyLink.findFirst({
-        where: { caregiverId: session.id, elderId, status: 'ACTIVE' },
-        include: { elder: true },
-      });
-      if (!link) {
-        return NextResponse.json({ error: 'No active family link found for this elder' }, { status: 403 });
-      }
+
       targetElderId = elderId;
-      elderName = link.elder.fullName;
     }
 
-    const settings = await prisma.protectionSettings.findUnique({
+    let settings = await prisma.protectionSettings.findUnique({
       where: { elderId: targetElderId },
     });
+
+    if (!settings) {
+      try {
+        settings = await prisma.protectionSettings.create({
+          data: {
+            elderId: targetElderId,
+            currency: 'USD',
+            familyApprovalThreshold: 100,
+            absoluteDailyCap: 1000,
+            absoluteTransactionCap: 500,
+            monthlyBudget: 2000,
+            requireFamilyForNewRecipient: true,
+            requireFamilyForUnusual: true,
+            approvalTimeoutMinutes: 30,
+          },
+        });
+      } catch {
+        // Handled if concurrent insert
+      }
+    }
 
     const currentDailyCap = settings ? Number(settings.absoluteDailyCap.toString()) : 1000;
     const currentMonthlyBudget = settings?.monthlyBudget ? Number(settings.monthlyBudget.toString()) : 2000;
@@ -99,14 +166,22 @@ export async function GET(req: NextRequest) {
 
     let targetElderIds: string[] = [];
 
-    if (session.roleDefault === Role.CAREGIVER) {
+    const isLinkedAsElder = await prisma.familyLink.findFirst({
+      where: { elderId: session.id, status: 'ACTIVE' },
+    });
+    const hasCaregiverLinks = await prisma.familyLink.findFirst({
+      where: { caregiverId: session.id, status: 'ACTIVE' },
+    });
+    const isElder = session.roleDefault === Role.PROTECTED_USER || (!!isLinkedAsElder && !hasCaregiverLinks);
+
+    if (isElder) {
+      targetElderIds = [session.id];
+    } else {
       const links = await prisma.familyLink.findMany({
         where: { caregiverId: session.id, status: 'ACTIVE' },
         select: { elderId: true },
       });
       targetElderIds = links.map((l) => l.elderId);
-    } else {
-      targetElderIds = [session.id];
     }
 
     if (targetElderIds.length === 0) {

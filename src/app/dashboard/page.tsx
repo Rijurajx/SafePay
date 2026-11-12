@@ -326,6 +326,7 @@ export default function DashboardPage() {
   const [seniorLimitReason, setSeniorLimitReason] = useState('');
   const [seniorLimitSubmitting, setSeniorLimitSubmitting] = useState(false);
   const [seniorLimitSuccess, setSeniorLimitSuccess] = useState<string | null>(null);
+  const [seniorLimitError, setSeniorLimitError] = useState<string | null>(null);
 
   // Senior Navigation & Simulation States
   const [seniorTab, setSeniorTab] = useState<'profile' | 'ledger'>('profile');
@@ -923,7 +924,9 @@ export default function DashboardPage() {
   const handleSeniorRequestLimit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSeniorLimitSubmitting(true);
+    setSeniorLimitError(null);
     try {
+      const targetElderId = activeElder?.id || (currentUser?.roleDefault === 'PROTECTED_USER' ? currentUser.id : undefined);
       const res = await fetch('/api/family/limit-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -931,6 +934,7 @@ export default function DashboardPage() {
           limitType: seniorLimitType,
           requestedAmount: Number(seniorLimitAmount),
           reason: seniorLimitReason,
+          elderId: targetElderId,
         }),
       });
       const data = await res.json();
@@ -941,9 +945,15 @@ export default function DashboardPage() {
         setIsSeniorLimitModalOpen(false);
         setSeniorLimitSuccess(null);
         setSeniorLimitReason('');
-      }, 3000);
+        setSeniorLimitError(null);
+      }, 2500);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Error submitting request');
+      const msg = err instanceof Error ? err.message : 'Error submitting request';
+      setSeniorLimitError(msg);
+      setActionNotice({
+        message: msg,
+        type: 'error',
+      });
     } finally {
       setSeniorLimitSubmitting(false);
     }
@@ -1423,8 +1433,12 @@ export default function DashboardPage() {
                     </div>
                     <div className="space-y-2">
                       <button
-                        onClick={() => setIsSeniorLimitModalOpen(true)}
-                        className="w-full py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95"
+                        onClick={() => {
+                          setSeniorLimitError(null);
+                          setSeniorLimitSuccess(null);
+                          setIsSeniorLimitModalOpen(true);
+                        }}
+                        className="w-full py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                       >
                         <Sparkles className="w-3.5 h-3.5 text-purple-200" />
                         <span>Request Limit Increase</span>
@@ -2084,6 +2098,12 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <form onSubmit={handleSeniorRequestLimit} className="space-y-4">
+                    {seniorLimitError && (
+                      <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span>{seniorLimitError}</span>
+                      </div>
+                    )}
                     <div>
                       <label className="text-xs font-bold text-slate-700 block mb-1">Limit to Increase</label>
                       <div className="grid grid-cols-2 gap-2">
