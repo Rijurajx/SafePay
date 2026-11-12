@@ -156,7 +156,7 @@ export default function HomePage() {
       {/* =========================================================================
           1. FLOATING LIQUID GLASS NAVIGATION BAR
           ========================================================================= */}
-      <nav className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-5xl liquid-glass rounded-full px-5 py-2.5 flex items-center justify-between shadow-[0_12px_36px_rgba(0,0,0,0.06)] border border-white/80 transition-all duration-200">
+      <nav className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-3xl liquid-glass rounded-full px-6 py-2.5 flex items-center justify-between shadow-[0_12px_36px_rgba(0,0,0,0.06)] border border-white/80 transition-all duration-200">
         {/* Brand */}
         <Link href="/" className="flex items-center gap-2.5 group shrink-0">
           <div className="w-8 h-8 rounded-full bg-slate-950 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
@@ -166,7 +166,7 @@ export default function HomePage() {
         </Link>
 
         {/* Center Desktop Navigation Links */}
-        <div className="hidden md:flex items-center gap-7 text-xs font-semibold text-slate-600">
+        <div className="hidden md:flex items-center gap-6 text-xs font-semibold text-slate-600">
           <button
             onClick={() => setStoryModalOpen(true)}
             className="hover:text-slate-950 transition-colors cursor-pointer"
@@ -202,7 +202,7 @@ export default function HomePage() {
           {currentUser ? (
             <Link
               href="/dashboard"
-              className="px-4.5 py-1.5 rounded-full bg-slate-950 text-white text-xs font-semibold hover:bg-slate-800 active:scale-[0.98] transition-all shadow-xs flex items-center gap-1.5"
+              className="px-6 py-2.5 rounded-full bg-slate-950 text-white text-xs sm:text-sm font-semibold hover:bg-slate-800 active:scale-[0.98] transition-all shadow-xs flex items-center gap-2"
             >
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
               <span>Open App</span>
@@ -210,7 +210,7 @@ export default function HomePage() {
           ) : (
             <Link
               href="/signin"
-              className="px-4.5 py-1.5 rounded-full bg-slate-950 text-white text-xs font-semibold hover:bg-slate-800 active:scale-[0.98] transition-all shadow-xs flex items-center gap-1.5"
+              className="px-6 py-2.5 rounded-full bg-slate-950 text-white text-xs sm:text-sm font-semibold hover:bg-slate-800 active:scale-[0.98] transition-all shadow-xs flex items-center gap-2"
             >
               <span>Sign In</span>
               <ArrowRight className="w-3.5 h-3.5 text-purple-400" />
@@ -333,12 +333,7 @@ export default function HomePage() {
             {/* Luna AI Brand with Responsive Ball Mascot */}
             <div className="flex items-center gap-2.5">
               <LunaMascot size="sm" />
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm tracking-tight">Luna AI</span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 border border-purple-500/20">
-                  Guardian Engine
-                </span>
-              </div>
+              <span className="font-bold text-sm tracking-tight">Luna AI</span>
             </div>
 
             {/* Dark / Light Mode Toggle Button */}
@@ -504,9 +499,6 @@ export default function HomePage() {
                   }`}
                 >
                   <span>PayPal SafePay Circle</span>
-                  <span className="text-emerald-500 font-semibold flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Protected
-                  </span>
                 </div>
               )}
             </aside>
@@ -536,10 +528,6 @@ export default function HomePage() {
                     </div>
                   </div>
                 </div>
-
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hidden sm:inline-block">
-                  Live Guardian RAG
-                </span>
               </div>
 
               {/* Scrollable Chat & Approval Area */}
@@ -552,7 +540,7 @@ export default function HomePage() {
                         <Clock className="w-4 h-4 animate-spin" />
                         <span>Action Required ({activeElder.name})</span>
                       </div>
-                      <span className="text-[10px] bg-amber-400/20 text-amber-500 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+                      <span className="text-[11px] text-amber-500 font-semibold">
                         Caregiver Review
                       </span>
                     </div>
@@ -582,13 +570,10 @@ export default function HomePage() {
                         <p className="text-xs font-semibold text-slate-500 mt-1">
                           {activeElder.pendingHold.merchant} • {activeElder.pendingHold.category}
                         </p>
-                        <div className="flex items-center justify-center gap-2 mt-1.5">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
-                            Risk Score: {activeElder.pendingHold.riskScore}/100
-                          </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 border border-purple-500/20">
-                            Account: {activeElder.name}
-                          </span>
+                        <div className="flex items-center justify-center gap-2 mt-1.5 text-[11px] font-medium text-slate-500">
+                          <span>Risk Score: {activeElder.pendingHold.riskScore}/100</span>
+                          <span>•</span>
+                          <span>Account: {activeElder.name}</span>
                         </div>
                       </div>
 
@@ -745,31 +730,10 @@ export default function HomePage() {
       </section>
 
       {/* =========================================================================
-          4. STATEMENT SECTION WITH GIANT RESPONSIVE LUNA MASCOT
+          3. FEATURES SECTION
           ========================================================================= */}
-      <section className="px-6 py-12 max-w-6xl mx-auto">
-        <div className="relative liquid-glass rounded-3xl p-8 sm:p-14 overflow-hidden flex flex-col justify-center border border-white/80 shadow-md">
-          <h2 className="text-2xl sm:text-4xl md:text-5xl font-semibold leading-tight max-w-2xl text-slate-950 tracking-tight">
-            SafePay acts as an <span className="text-slate-500">invisible safety net</span> that grows more intuitive
-            with every interaction.
-          </h2>
-
-          {/* Giant Cursor-Tracking Luna Statement Mascot */}
-          <div className="absolute -bottom-8 -right-8">
-            <LunaMascot size="xl" />
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          5. FEATURES SECTION (REPLACING OLD SECTION BELOW STATEMENT)
-          ========================================================================= */}
-      <section id="features" className="px-6 py-16 max-w-6xl mx-auto space-y-12">
+      <section id="features" className="px-6 py-20 max-w-6xl mx-auto space-y-12">
         <div className="text-center max-w-3xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Autonomous Payment Safeguards</span>
-          </div>
           <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-950">
             Engineered for Independence &amp; Family Security
           </h2>

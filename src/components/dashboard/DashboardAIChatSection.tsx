@@ -207,13 +207,6 @@ export function DashboardAIChatSection({
           <span className="text-[11px] font-semibold text-slate-400">•</span>
           <span className="text-[11px] text-slate-600 font-semibold">Account: {elderName}</span>
         </div>
-
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[10px] font-mono font-bold text-emerald-700 uppercase tracking-wider hidden sm:inline">
-            Isolated Context Active
-          </span>
-        </div>
       </div>
 
       {/* Main Chat Messages Container */}
@@ -234,9 +227,9 @@ export function DashboardAIChatSection({
               <p className="text-xs font-semibold text-slate-600 mt-0.5">
                 {latestHold.merchantName} • {latestHold.category}
               </p>
-              <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
+              <p className="mt-1 text-[11px] font-medium text-slate-500">
                 Risk Score: {latestHold.riskScore}/100
-              </span>
+              </p>
             </div>
             <button
               onClick={() => handleSend(`Why was the $${latestHold.amount.toFixed(0)} charge from ${latestHold.merchantName} held?`)}

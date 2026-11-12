@@ -3311,7 +3311,7 @@ export default function DashboardPage() {
                             <Clock className="w-4 h-4 animate-spin" />
                             <span>Action Required ({activeElder.fullName})</span>
                           </div>
-                          <span className="text-[10px] bg-amber-400/20 text-amber-500 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+                          <span className="text-[11px] text-amber-500 font-semibold">
                             Caregiver Review
                           </span>
                         </div>
@@ -3351,13 +3351,10 @@ export default function DashboardPage() {
                               <p className="text-xs font-semibold text-slate-500 mt-1">
                                 {hold.merchantName} • {hold.category}
                               </p>
-                              <div className="flex items-center justify-center gap-2 mt-1.5">
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
-                                  Risk Score: {hold.riskScore}/100
-                                </span>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 border border-purple-500/20">
-                                  Account: {activeElder.fullName}
-                                </span>
+                              <div className="flex items-center justify-center gap-2 mt-1.5 text-[11px] font-medium text-slate-500">
+                                <span>Risk Score: {hold.riskScore}/100</span>
+                                <span>•</span>
+                                <span>Account: {activeElder.fullName}</span>
                               </div>
                             </div>
 
