@@ -6,7 +6,7 @@ import { env } from '@/lib/env';
 export const dynamic = 'force-dynamic';
 
 const demoSwitchSchema = z.object({
-  persona: z.enum(['thomas', 'maya', 'david', 'sarah']),
+  persona: z.enum(['thomas', 'maya', 'david', 'sarah', 'senior', 'caregiver']),
 });
 
 export async function POST(req: NextRequest) {

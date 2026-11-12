@@ -43,7 +43,7 @@ import {
   Table,
   LayoutList,
 } from 'lucide-react';
-import { SessionUser, DemoPersonaKey } from '@/types';
+import { SessionUser } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 import { LunaMascot } from '@/components/mascot/LunaMascot';
 import { SafePayLogo } from '@/components/brand/SafePayLogo';
@@ -627,19 +627,6 @@ export default function DashboardPage() {
     }
     setCopiedDraftId(id);
     setTimeout(() => setCopiedDraftId(null), 2500);
-  };
-
-  const switchPersona = async (key: DemoPersonaKey) => {
-    try {
-      await fetch('/api/auth/demo-switch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ persona: key }),
-      });
-      await fetchSummary();
-    } catch (e) {
-      console.error(e);
-    }
   };
 
   const handleLogout = async () => {
@@ -2682,23 +2669,6 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-2.5">
-            {currentUser?.isSynthetic && (
-              <div className="hidden sm:flex items-center bg-black/[0.04] p-1 rounded-full border border-black/5">
-                <button
-                  onClick={() => switchPersona('thomas')}
-                  className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-slate-600 hover:text-slate-950"
-                >
-                  Mr. Thomas
-                </button>
-                <button
-                  onClick={() => switchPersona('maya')}
-                  className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-950 text-white shadow-xs"
-                >
-                  Maya
-                </button>
-              </div>
-            )}
-
             {activeElder && (
               <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 text-xs font-semibold">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />

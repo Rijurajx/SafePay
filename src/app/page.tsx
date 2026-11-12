@@ -23,6 +23,8 @@ import {
   BookOpen,
   HelpCircle,
   X,
+  User,
+  RefreshCw,
   Heart,
   Clock,
   Copy,
@@ -116,6 +118,30 @@ export default function HomePage() {
   const [docsModalOpen, setDocsModalOpen] = useState(false);
   const [instructionsModalOpen, setInstructionsModalOpen] = useState(false);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [demoAccountModalOpen, setDemoAccountModalOpen] = useState(false);
+  const [switchingPersona, setSwitchingPersona] = useState<'senior' | 'caregiver' | null>(null);
+
+  const handleLaunchDemoAccount = async (persona: 'senior' | 'caregiver') => {
+    try {
+      setSwitchingPersona(persona);
+      const res = await fetch('/api/auth/demo-switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ persona }),
+      });
+      if (res.ok) {
+        window.location.href = '/dashboard';
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to initialize demo session');
+        setSwitchingPersona(null);
+      }
+    } catch (err) {
+      console.error('Failed to open demo account:', err);
+      alert('Network error connecting to demo account');
+      setSwitchingPersona(null);
+    }
+  };
 
   // Active selected elder in demo
   const activeElder = DEMO_ELDERS.find((e) => e.id === selectedElderId) || DEMO_ELDERS[0];
@@ -299,7 +325,7 @@ export default function HomePage() {
           </Link>
 
           <button
-            onClick={() => setVideoModalOpen(true)}
+            onClick={() => setDemoAccountModalOpen(true)}
             className="liquid-glass px-6 py-3 rounded-full text-slate-900 font-medium text-sm hover:bg-white/90 active:scale-[0.98] transition-all flex items-center gap-2 shadow-xs cursor-pointer"
           >
             <div className="w-5 h-5 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
@@ -1248,6 +1274,123 @@ export default function HomePage() {
                 className="px-5 py-2.5 rounded-full bg-slate-950 text-white text-xs font-semibold hover:bg-slate-800 transition-colors shadow-xs"
               >
                 Understood
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW DEMO ACCOUNT SELECTION MODAL */}
+      {demoAccountModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-xl liquid-glass rounded-3xl p-6 sm:p-8 border border-white/90 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-black/5 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center shadow-xs">
+                  <Sparkles className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-950">Explore SafePay Demo</h3>
+                  <p className="text-xs text-slate-500">Instant access for judges and evaluators — no signup required</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDemoAccountModalOpen(false)}
+                className="p-1.5 rounded-full hover:bg-black/5 text-slate-500 hover:text-slate-950 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Card 1: Demo Senior */}
+              <div className="p-5 rounded-2xl bg-white/90 border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-4 hover:border-purple-300 transition-all">
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs">
+                      <User className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200/50">
+                      Senior View
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-extrabold text-slate-900">Demo Senior</h4>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                      Experience independent shopping, live PayPal Sandbox checkouts, Luna AI companion, and automatic protection holds.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  disabled={switchingPersona !== null}
+                  onClick={() => handleLaunchDemoAccount('senior')}
+                  className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer disabled:opacity-60"
+                >
+                  {switchingPersona === 'senior' ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Opening Senior App...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Open as Demo Senior</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Card 2: Demo Caregiver */}
+              <div className="p-5 rounded-2xl bg-white/90 border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-4 hover:border-amber-300 transition-all">
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">
+                      <ShieldCheck className="w-5 h-5 text-amber-700" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/50">
+                      Caregiver View
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-extrabold text-slate-900">Demo Caregiver</h4>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                      Review pending family approvals, set caps &amp; auto-thresholds, monitor AG Grid transaction ledgers, and manage PayPal.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  disabled={switchingPersona !== null}
+                  onClick={() => handleLaunchDemoAccount('caregiver')}
+                  className="w-full py-2.5 px-4 rounded-xl bg-slate-950 hover:bg-slate-800 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer disabled:opacity-60"
+                >
+                  {switchingPersona === 'caregiver' ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Opening Caregiver App...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Open as Demo Caregiver</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-black/5 text-xs text-slate-500">
+              <span className="text-[11px]">All controls and features are identical to created accounts</span>
+              <button
+                onClick={() => {
+                  setDemoAccountModalOpen(false);
+                  setVideoModalOpen(true);
+                }}
+                className="text-purple-600 hover:text-purple-800 font-semibold text-[11px] flex items-center gap-1 cursor-pointer"
+              >
+                <Play className="w-3 h-3 fill-purple-600" />
+                <span>Or watch video demonstration</span>
               </button>
             </div>
           </div>

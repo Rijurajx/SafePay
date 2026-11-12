@@ -1,6 +1,6 @@
 import { Role, FamilyLinkStatus, RiskClassification, PaymentRequestStatus } from '@prisma/client';
 
-export type DemoPersonaKey = 'thomas' | 'maya' | 'david' | 'sarah';
+export type DemoPersonaKey = 'thomas' | 'maya' | 'david' | 'sarah' | 'senior' | 'caregiver';
 
 export interface DemoPersona {
   key: DemoPersonaKey;

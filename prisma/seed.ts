@@ -14,15 +14,15 @@ export const DEMO_PASSWORDS = 'DemoPassword123!';
 export const SEEDED_PERSONAS = {
   thomas: {
     id: '11111111-1111-4111-a111-111111111111',
-    email: 'thomas@demo.local',
-    fullName: 'Thomas Sterling',
+    email: 'senior@demo.local',
+    fullName: 'Demo Senior',
     roleDefault: Role.PROTECTED_USER,
     isSynthetic: true,
   },
   maya: {
     id: '22222222-2222-4222-a222-222222222222',
-    email: 'maya@demo.local',
-    fullName: 'Maya Sterling-Lin',
+    email: 'caregiver@demo.local',
+    fullName: 'Demo Caregiver',
     roleDefault: Role.CAREGIVER,
     isSynthetic: true,
   },
@@ -48,6 +48,7 @@ async function main() {
 
   // 1. Seed or update Users
   for (const persona of Object.values(SEEDED_PERSONAS)) {
+    const isCaregiver = persona.roleDefault === Role.CAREGIVER;
     await prisma.user.upsert({
       where: { id: persona.id },
       update: {
@@ -57,6 +58,13 @@ async function main() {
         isSynthetic: true,
         isActive: true,
         passwordHash,
+        ...(isCaregiver
+          ? {
+              paypalEmail: 'demo.caregiver@paypal-sandbox.com',
+              paypalAccountId: 'PP-DEMO-CAREGIVER-991',
+              paypalConnectedAt: new Date(),
+            }
+          : {}),
       },
       create: {
         id: persona.id,
@@ -67,6 +75,13 @@ async function main() {
         isSynthetic: true,
         isActive: true,
         passwordHash,
+        ...(isCaregiver
+          ? {
+              paypalEmail: 'demo.caregiver@paypal-sandbox.com',
+              paypalAccountId: 'PP-DEMO-CAREGIVER-991',
+              paypalConnectedAt: new Date(),
+            }
+          : {}),
       },
     });
   }
